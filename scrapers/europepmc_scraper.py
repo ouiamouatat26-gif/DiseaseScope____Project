@@ -15,7 +15,7 @@ def scraper_europe_pmc(maladie):
 
     print(f"\n Scraping Europe PMC pour : {maladie}")
 
-    # ── 1. Recherche des articles ──────────────────────────────────────────────
+    #Recherche des articles 
     url_search = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 
     params_search = {
@@ -81,7 +81,6 @@ def scraper_europe_pmc(maladie):
 
     print(f"    {articles_sauvegardes} nouveaux articles sauvegardés")
 
-    # Respecte le rate limit de l'API
     time.sleep(1)
 
 
