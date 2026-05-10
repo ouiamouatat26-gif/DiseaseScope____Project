@@ -6,7 +6,7 @@ via la Presse Médicale Mondiale
 
 ## C'est quoi ce projet ?
 Un agrégateur intelligent qui :
-- Scrape des articles médicaux depuis PubMed, WebMD et WHO
+- Scrape des articles médicaux depuis PubMed, Europe PMC, ClinicalTrials et WHO
 - Stocke les données dans MongoDB
 - Classifie les articles avec un modèle Machine Learning (Random Forest)
 - Visualise les tendances dans une interface web
@@ -37,8 +37,8 @@ source venv/bin/activate     (Mac/Linux)
 ### 3. Installer les bibliothèques
 pip install -r requirements.txt
 
-### 4. Lancer le scraper PubMed
-python scrapers/pubmed_scraper.py
+### 4. Lancer les scrapers
+python scrapers/nomdusite_scraper.py
 
 ---
 
@@ -48,9 +48,10 @@ python scrapers/pubmed_scraper.py
 
 ### Semaine 1 — Scraping ✅
 - [x] Scraper PubMed via API officielle
-- [x] 302 articles stockés dans MongoDB
-- [ ] Scraper WebMD 
-- [ ] Scraper WHO
+- [x] Scraper Europe PMC 
+- [x] Scraper WHO
+- [x] Scraper ClinicalTrials
+- [x] Articles stockés dans MongoDB
 ### Semaine 2 — Nettoyage 🔜
 ### Semaine 3 — Qualité des données 🔜
 ### Semaine 4 — Machine Learning 🔜
