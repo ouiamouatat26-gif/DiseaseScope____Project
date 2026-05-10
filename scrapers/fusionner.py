@@ -7,7 +7,7 @@ collection_finale = db["articles_tous"]
 maladies = ["cancer", "diabetes", "alzheimer", "heart disease"]
 sources = ["articles_pubmed", "articles_europe_pmc", "articles_who", "clinical_trials"]
 
-print("===== Fusion des collections =====")
+print(" Fusion des collections ")
 
 total = 0
 doublons = 0
