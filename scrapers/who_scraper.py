@@ -90,7 +90,7 @@ def scraper_who(maladie):
     return sauvegardes
 
 if __name__ == "__main__":
-    print("===== WHO Scraper =====")
+    print("WHO Scraper ")
     total = 0
     for m in maladies:
         total += scraper_who(m)
