@@ -74,7 +74,7 @@ def scraper_europe_pmc(maladie):
     return sauvegardes
 
 if __name__ == "__main__":
-    print("===== Europe PMC Scraper =====")
+    print("=== Europe PMC Scraper ===")
     total = 0
     for m in maladies:
         total += scraper_europe_pmc(m)
