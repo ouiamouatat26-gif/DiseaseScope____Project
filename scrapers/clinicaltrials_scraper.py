@@ -65,7 +65,7 @@ def scraper_clinical_trials(maladie):
     return sauvegardes
 
 if __name__ == "__main__":
-    print("===== ClinicalTrials Scraper =====")
+    print("=== ClinicalTrials Scraper ===")
     total = 0
     for m in maladies:
         total += scraper_clinical_trials(m)
