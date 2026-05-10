@@ -72,7 +72,7 @@ def scraper_pubmed(maladie):
     return sauvegardes
 
 if __name__ == "__main__":
-    print("===== PubMed Scraper =====")
+    print("=== PubMed Scraper ===")
     total = 0
     for m in maladies:
         total += scraper_pubmed(m)
