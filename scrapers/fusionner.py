@@ -47,7 +47,7 @@ for nom in sources:
         except Exception as e:
             continue
 
-print(f"\n===== Resultat =====")
+print(f"\n=== Resultat ===")
 print(f"Total fusionne : {total}")
 print(f"Doublons ignores : {doublons}")
 print(f"Total articles_tous : {collection_finale.count_documents({})}")
