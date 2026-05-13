@@ -4,7 +4,12 @@ from datetime import datetime
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection_finale = db["articles_tous"]
-maladies = ["cancer", "diabetes", "alzheimer", "heart disease"]
+maladies = [
+    "cancer", "diabetes", "alzheimer", "heart disease",
+    "neurological diseases", "respiratory diseases",
+    "eye diseases", "digestive diseases",
+    "infectious diseases", "autoimmune diseases"
+]
 sources = ["articles_pubmed", "articles_europe_pmc", "articles_who", "clinical_trials"]
 
 print(" Fusion des collections ")

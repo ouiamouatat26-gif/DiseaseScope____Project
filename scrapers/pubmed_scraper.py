@@ -7,8 +7,12 @@ import time
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["articles_pubmed"]
-maladies = ["cancer", "diabetes", "alzheimer", "heart disease"]
-
+maladies = [
+    "cancer", "diabetes", "alzheimer", "heart disease",
+    "neurological diseases", "respiratory diseases",
+    "eye diseases", "digestive diseases",
+    "infectious diseases", "autoimmune diseases"
+]
 def scraper_pubmed(maladie):
     print(f"\n Scraping PubMed : {maladie}")
 

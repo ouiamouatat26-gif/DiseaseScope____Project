@@ -6,8 +6,12 @@ import time
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["articles_who"]
-maladies = ["cancer", "diabetes", "alzheimer", "heart disease"]
-
+maladies = [
+    "cancer", "diabetes", "alzheimer", "heart disease",
+    "neurological diseases", "respiratory diseases",
+    "eye diseases", "digestive diseases",
+    "infectious diseases", "autoimmune diseases"
+]
 session = requests.Session()
 session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
