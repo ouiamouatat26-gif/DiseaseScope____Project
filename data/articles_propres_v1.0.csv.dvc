@@ -1,0 +1,5 @@
+outs:
+- md5: 2b70fdaa66190d89697a49cc4fc4e552
+  size: 5097956
+  hash: md5
+  path: articles_propres_v1.0.csv
