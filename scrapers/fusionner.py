@@ -10,7 +10,13 @@ maladies = [
     "eye diseases", "digestive diseases",
     "infectious diseases", "autoimmune diseases"
 ]
-sources = ["articles_pubmed", "articles_europe_pmc", "articles_who", "clinical_trials"]
+sources = [
+    "articles_pubmed",
+    "articles_europe_pmc",
+    "articles_who",
+    "clinical_trials",
+    "articles_medlineplus"
+]
 
 print(" Fusion des collections ")
 
