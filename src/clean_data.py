@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-
 import pandas as pd
 
 RAW_DATA_PATH = Path("data/raw_articles_final.csv")
