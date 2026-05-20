@@ -6,136 +6,140 @@ import re
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 
-collections = [
+COLLECTIONS = [
     "articles_pubmed",
     "articles_europe_pmc",
     "articles_who",
     "clinical_trials",
-    "articles_medlineplus"
+    "articles_medlineplus",
 ]
 
-def valeur_vide(valeur):
-    if valeur is None:
-        return True
-    if isinstance(valeur, float) and pd.isna(valeur):
-        return True
-    if isinstance(valeur, list):
-        return len([v for v in valeur if not valeur_vide(v)]) == 0
-    return str(valeur).strip() == ""
 
-def nettoyer_texte(valeur):
-    if valeur_vide(valeur):
+def is_empty(value):
+    if value is None:
+        return True
+    if isinstance(value, float) and pd.isna(value):
+        return True
+    if isinstance(value, list):
+        return len([v for v in value if not is_empty(v)]) == 0
+    return str(value).strip() == ""
+
+
+def clean_text(value):
+    if is_empty(value):
         return ""
-    texte = str(valeur)
-    texte = re.sub(r"<[^>]+>", " ", texte)
-    texte = re.sub(r"\s+", " ", texte).strip()
-    return texte
+    text = str(value)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
-def normaliser_liste(valeur):
-    if valeur_vide(valeur):
+
+def normalize_list(value):
+    if is_empty(value):
         return []
-    if isinstance(valeur, list):
-        return [nettoyer_texte(v) for v in valeur if not valeur_vide(v)]
-    return [v.strip() for v in str(valeur).split("|") if v.strip()]
+    if isinstance(value, list):
+        return [clean_text(v) for v in value if not is_empty(v)]
+    return [v.strip() for v in str(value).split("|") if v.strip()]
 
-def completer_article(article):
-    maladie = nettoyer_texte(article.get("maladie"))
-    source = nettoyer_texte(article.get("source"))
-    titre = nettoyer_texte(article.get("titre"))
-    journal = nettoyer_texte(article.get("journal"))
 
-    article["titre"] = titre or "Sans titre"
-    article["resume"] = nettoyer_texte(article.get("resume"))
-    article["journal"] = journal or source or "Inconnu"
-    article["maladie"] = maladie
+def complete_article(article):
+    disease = clean_text(article.get("maladie"))
+    source = clean_text(article.get("source"))
+    title = clean_text(article.get("titre"))
+    journal = clean_text(article.get("journal"))
+
+    article["titre"] = title or "Untitled"
+    article["resume"] = clean_text(article.get("resume"))
+    article["journal"] = journal or source or "Unknown"
+    article["maladie"] = disease
     article["source"] = source
 
-    auteurs = normaliser_liste(article.get("auteurs"))
-    if not auteurs:
-        if article["journal"] != "Inconnu":
-            auteurs = [article["journal"]]
+    authors = normalize_list(article.get("auteurs"))
+    if not authors:
+        if article["journal"] != "Unknown":
+            authors = [article["journal"]]
         elif source:
-            auteurs = [source]
+            authors = [source]
         else:
-            auteurs = ["Inconnu"]
-    article["auteurs"] = auteurs
+            authors = ["Unknown"]
+    article["auteurs"] = authors
 
-    mots_cles = normaliser_liste(article.get("mots_cles"))
-    for mot in [maladie, source]:
-        if mot and mot not in mots_cles:
-            mots_cles.append(mot)
-    article["mots_cles"] = mots_cles
+    keywords = normalize_list(article.get("mots_cles"))
+    for word in [disease, source]:
+        if word and word not in keywords:
+            keywords.append(word)
+    article["mots_cles"] = keywords
 
     if not article["resume"]:
-        article["resume"] = titre
-        if maladie:
-            article["resume"] += f" - document relatif a {maladie}."
+        article["resume"] = title
+        if disease:
+            article["resume"] += f" — document related to {disease}."
 
-    if valeur_vide(article.get("date_publication")):
-        article["date_publication"] = "Inconnue"
-    if valeur_vide(article.get("type_contenu")):
+    if is_empty(article.get("date_publication")):
+        article["date_publication"] = "Unknown"
+    if is_empty(article.get("type_contenu")):
         article["type_contenu"] = "non_classifie"
 
     return article
 
-print("Fusion des collections...")
-tous = []
 
-for nom_collection in collections:
-    col = db[nom_collection]
+print("Merging collections...")
+all_articles = []
+
+for collection_name in COLLECTIONS:
+    col = db[collection_name]
     articles = list(col.find({}, {"_id": 0}))
-    print(f"   {nom_collection} : {len(articles)} articles")
-    tous.extend([completer_article(article) for article in articles])
+    print(f"  {collection_name}: {len(articles)} articles")
+    all_articles.extend([complete_article(a) for a in articles])
 
-print(f"\nTotal brut : {len(tous)}")
+print(f"\nRaw total: {len(all_articles)}")
 
-# Convertir en DataFrame
-df = pd.DataFrame(tous)
+if not all_articles:
+    print("No articles found. Run the scrapers first.")
+    exit(1)
 
-# Nettoyer les listes vers strings pour CSV
+df = pd.DataFrame(all_articles)
+
 for col in ["auteurs", "mots_cles"]:
     if col in df.columns:
-        df[col] = df[col].apply(
-            lambda x: " | ".join(normaliser_liste(x))
-        )
+        df[col] = df[col].apply(lambda x: " | ".join(normalize_list(x)))
 
-# Garder seulement les colonnes utiles
-colonnes = ["titre", "resume", "auteurs", "date_publication",
-            "journal", "mots_cles", "maladie", "source",
-            "lien", "type_contenu", "date_scraping"]
+COLUMNS = [
+    "titre", "resume", "auteurs", "date_publication",
+    "journal", "mots_cles", "maladie", "source",
+    "lien", "type_contenu", "date_scraping",
+]
 
-for col in colonnes:
+for col in COLUMNS:
     if col not in df.columns:
         df[col] = ""
 
-df = df[colonnes]
+df = df[COLUMNS]
 
-# Supprimer doublons sur le titre
-avant = len(df)
-df = df.drop_duplicates(subset=["titre"])
-print(f"Doublons supprimes : {avant - len(df)}")
-print(f"Articles uniques : {len(df)}")
+before = len(df)
+df = df[df["lien"] != ""]
+df = df.drop_duplicates(subset=["lien"])
+df = df.drop_duplicates(subset=["titre", "source"])
+print(f"Duplicates removed: {before - len(df)}")
+print(f"Unique articles: {len(df)}")
 
-# Sauvegarder dans MongoDB collection unifiee
 db["articles_tous"].drop()
 db["articles_tous"].insert_many(df.to_dict("records"))
-print("Sauvegarde dans MongoDB : articles_tous")
+print("Saved to MongoDB: articles_tous")
 
-# Exporter CSV
 df.to_csv("data/raw_articles_final.csv", index=False, encoding="utf-8-sig")
-print("CSV exporte : data/raw_articles_final.csv")
+print("CSV exported: data/raw_articles_final.csv")
 
-# Rapport qualite
-print("\n--- QUALITE (seuil 15%) ---")
+print("\n--- QUALITY CHECK (15% threshold) ---")
 total = len(df)
 for col in ["titre", "resume", "auteurs", "date_publication", "journal", "mots_cles", "maladie"]:
-    vides = (df[col] == "").sum() + df[col].isna().sum()
-    pct = round(vides / total * 100, 1)
-    statut = "OK" if pct <= 15 else "DEPASSE"
-    print(f"{statut} {col:20} : {pct}% vide ({vides}/{total})")
+    empty = (df[col] == "").sum() + df[col].isna().sum()
+    pct = round(empty / total * 100, 1)
+    status = "OK" if pct <= 15 else "EXCEEDS THRESHOLD"
+    print(f"{status:20} {col:20}: {pct}% empty ({empty}/{total})")
 
-print(f"\n--- PAR SOURCE ---")
+print("\n--- BY SOURCE ---")
 print(df["source"].value_counts().to_string())
 
-print(f"\n--- PAR MALADIE ---")
+print("\n--- BY DISEASE ---")
 print(df["maladie"].value_counts().to_string())

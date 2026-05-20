@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DiseaseScope — Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1a1d27;
+            border-bottom: 1px solid #2d3148;
+            padding: 1.25rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+
+        header span {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-left: auto;
+            background: #252836;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            background: #1e3a5f;
+            color: #60a5fa;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi {
+            background: #1a1d27;
+            border: 1px solid #2d3148;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .kpi .label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi .value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .kpi .sub {
+            font-size: 0.75rem;
+            color: #4ade80;
+            margin-top: 0.4rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: #1a1d27;
+            border: 1px solid #2d3148;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .card.full {
+            grid-column: 1 / -1;
+        }
+
+        .card h2 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 1.25rem;
+        }
+
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+        }
+
+        .chart-wrap.tall {
+            height: 320px;
+        }
+
+        .chart-wrap.medium {
+            height: 260px;
+        }
+
+        .chart-wrap.short {
+            height: 220px;
+        }
+
+        .chart-wrap canvas {
+            max-height: 100%;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filters input,
+        .filters select {
+            background: #252836;
+            border: 1px solid #2d3148;
+            color: #e2e8f0;
+            padding: 0.45rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .filters input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filters input::placeholder {
+            color: #6b7280;
+        }
+
+        .filters select option {
+            background: #252836;
+        }
+
+        /* Table */
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #2d3148;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        thead tr {
+            background: #252836;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        tbody tr {
+            border-top: 1px solid #1f2235;
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover {
+            background: #1f2235;
+        }
+
+        td {
+            padding: 0.7rem 1rem;
+            color: #cbd5e1;
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        td a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        td a:hover {
+            text-decoration: underline;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .tag-pubmed {
+            background: #1e3a5f;
+            color: #60a5fa;
+        }
+
+        .tag-who {
+            background: #1a3322;
+            color: #4ade80;
+        }
+
+        .tag-europe {
+            background: #2d1f3e;
+            color: #c084fc;
+        }
+
+        .tag-clinical {
+            background: #3a2208;
+            color: #fb923c;
+        }
+
+        .tag-medline {
+            background: #1f2a3e;
+            color: #7dd3fc;
+        }
+
+        .tag-default {
+            background: #2a2836;
+            color: #94a3b8;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+        }
+
+        .pagination button {
+            background: #252836;
+            border: 1px solid #2d3148;
+            color: #e2e8f0;
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.15s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #2d3148;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .pagination .page-info {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #4b5563;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="badge">Medical Intelligence</div>
+        <h1>DiseaseScope</h1>
+        <span id="last-updated">Loading...</span>
+    </header>
+
+    <main>
+
+        <!-- KPIs -->
+        <div class="kpi-row">
+            <div class="kpi">
+                <div class="label">Total Articles</div>
+                <div class="value" id="kpi-total">—</div>
+                <div class="sub">across all sources</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Data Sources</div>
+                <div class="value" id="kpi-sources">—</div>
+                <div class="sub">PubMed, WHO, Europe PMC...</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Diseases Tracked</div>
+                <div class="value" id="kpi-diseases">—</div>
+                <div class="sub">conditions monitored</div>
+            </div>
+        </div>
+
+        <!-- Row 1: Disease bar + Source donut -->
+        <div class="grid-2">
+            <div class="card">
+                <h2>Articles by Disease</h2>
+                <div class="chart-wrap tall">
+                    <canvas id="chartDisease"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Articles by Source</h2>
+                <div class="chart-wrap tall">
+                    <canvas id="chartSource"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Timeline + Content types + Keywords -->
+        <div class="grid-3">
+            <div class="card" style="grid-column: span 2;">
+                <h2>Publication Timeline</h2>
+                <div class="chart-wrap medium">
+                    <canvas id="chartTimeline"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Content Classification</h2>
+                <div class="chart-wrap medium">
+                    <canvas id="chartContentType"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Keywords + Disease-Source heatmap -->
+        <div class="grid-2">
+            <div class="card">
+                <h2>Top Keywords</h2>
+                <div class="chart-wrap tall">
+                    <canvas id="chartKeywords"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Coverage by Disease and Source</h2>
+                <div class="chart-wrap tall">
+                    <canvas id="chartHeatmap"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Article browser -->
+        <div class="card full">
+            <h2>Article Browser</h2>
+            <div class="filters">
+                <input type="text" id="searchInput" placeholder="Search by title or abstract..." />
+                <select id="filterDisease">
+                    <option value="">All diseases</option>
+                </select>
+                <select id="filterSource">
+                    <option value="">All sources</option>
+                </select>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Disease</th>
+                            <th>Source</th>
+                            <th>Journal</th>
+                            <th>Date</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="articleTable">
+                        <tr>
+                            <td colspan="6" class="empty-state">Loading articles...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="btnPrev" disabled>Previous</button>
+                <span class="page-info" id="pageInfo">—</span>
+                <button id="btnNext" disabled>Next</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const COLORS = [
+            "#60a5fa", "#4ade80", "#c084fc", "#fb923c", "#f472b6",
+            "#34d399", "#fbbf24", "#a78bfa", "#38bdf8", "#f87171",
+        ];
+
+        const BORDER_COLORS = COLORS.map(c => c + "cc");
+
+        function sourceTag(source) {
+            const s = (source || "").toLowerCase();
+            if (s.includes("pubmed")) return `<span class="tag tag-pubmed">${source}</span>`;
+            if (s.includes("who")) return `<span class="tag tag-who">${source}</span>`;
+            if (s.includes("europe")) return `<span class="tag tag-europe">${source}</span>`;
+            if (s.includes("clinical")) return `<span class="tag tag-clinical">${source}</span>`;
+            if (s.includes("medline")) return `<span class="tag tag-medline">${source}</span>`;
+            return `<span class="tag tag-default">${source}</span>`;
+        }
+
+        const chartDefaults = {
+            plugins: { legend: { labels: { color: "#94a3b8", font: { size: 12 } } } },
+            scales: {
+                x: { ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+                y: { ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+            },
+        };
+
+        async function fetchJSON(url) {
+            const r = await fetch(url);
+            return r.json();
+        }
+
+        // KPIs
+        async function loadOverview() {
+            const data = await fetchJSON("/api/overview");
+            document.getElementById("kpi-total").textContent = data.total_articles.toLocaleString();
+            document.getElementById("kpi-sources").textContent = data.total_sources;
+            document.getElementById("kpi-diseases").textContent = data.total_diseases;
+            document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
+        }
+
+        // Disease bar chart
+        async function loadDiseaseChart() {
+            const data = await fetchJSON("/api/by_disease");
+            new Chart(document.getElementById("chartDisease"), {
+                type: "bar",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: "Articles",
+                        data: data.values,
+                        backgroundColor: COLORS.slice(0, data.labels.length),
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }],
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+                        y: { ticks: { color: "#94a3b8", font: { size: 11 } }, grid: { display: false } },
+                    },
+                },
+            });
+        }
+
+        // Source donut chart
+        async function loadSourceChart() {
+            const data = await fetchJSON("/api/by_source");
+            new Chart(document.getElementById("chartSource"), {
+                type: "doughnut",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.values,
+                        backgroundColor: COLORS.slice(0, data.labels.length),
+                        borderColor: "#1a1d27",
+                        borderWidth: 3,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: "60%",
+                    plugins: {
+                        legend: {
+                            position: "right",
+                            labels: { color: "#94a3b8", font: { size: 12 }, padding: 14 },
+                        },
+                    },
+                },
+            });
+        }
+
+        // Timeline line chart
+        async function loadTimelineChart() {
+            const data = await fetchJSON("/api/by_year");
+            new Chart(document.getElementById("chartTimeline"), {
+                type: "line",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: "Articles published",
+                        data: data.values,
+                        borderColor: "#60a5fa",
+                        backgroundColor: "rgba(96,165,250,0.12)",
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: "#60a5fa",
+                        fill: true,
+                        tension: 0.4,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: "#6b7280", maxTicksLimit: 12 }, grid: { color: "#1f2235" } },
+                        y: { ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+                    },
+                },
+            });
+        }
+
+        // Content type donut
+        async function loadContentTypeChart() {
+            const data = await fetchJSON("/api/by_content_type");
+            new Chart(document.getElementById("chartContentType"), {
+                type: "doughnut",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.values,
+                        backgroundColor: COLORS.slice(0, data.labels.length),
+                        borderColor: "#1a1d27",
+                        borderWidth: 3,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: "55%",
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: { color: "#94a3b8", font: { size: 11 }, padding: 10 },
+                        },
+                    },
+                },
+            });
+        }
+
+        // Keywords bar chart
+        async function loadKeywordsChart() {
+            const data = await fetchJSON("/api/top_keywords");
+            new Chart(document.getElementById("chartKeywords"), {
+                type: "bar",
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: "Occurrences",
+                        data: data.values,
+                        backgroundColor: "rgba(192,132,252,0.7)",
+                        borderColor: "#c084fc",
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+                        y: { ticks: { color: "#94a3b8", font: { size: 11 } }, grid: { display: false } },
+                    },
+                },
+            });
+        }
+
+        // Heatmap as grouped bar
+        async function loadHeatmapChart() {
+            const data = await fetchJSON("/api/disease_source_matrix");
+            const datasets = data.sources.map((source, i) => ({
+                label: source,
+                data: data.matrix.map(row => row[i]),
+                backgroundColor: COLORS[i % COLORS.length] + "bb",
+                borderColor: COLORS[i % COLORS.length],
+                borderWidth: 1,
+                borderRadius: 3,
+            }));
+
+            new Chart(document.getElementById("chartHeatmap"), {
+                type: "bar",
+                data: { labels: data.diseases, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "top",
+                            labels: { color: "#94a3b8", font: { size: 10 }, padding: 8 },
+                        },
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { color: "#6b7280", font: { size: 10 } }, grid: { color: "#1f2235" } },
+                        y: { stacked: true, ticks: { color: "#6b7280" }, grid: { color: "#1f2235" } },
+                    },
+                },
+            });
+        }
+
+        // Article table with pagination
+        let currentPage = 1;
+        const PER_PAGE = 20;
+
+        async function loadArticles() {
+            const search = document.getElementById("searchInput").value;
+            const disease = document.getElementById("filterDisease").value;
+            const source = document.getElementById("filterSource").value;
+
+            const params = new URLSearchParams({
+                page: currentPage,
+                per_page: PER_PAGE,
+                search,
+                disease,
+                source,
+            });
+
+            const data = await fetchJSON("/api/articles?" + params.toString());
+            const tbody = document.getElementById("articleTable");
+
+            if (!data.articles.length) {
+                tbody.innerHTML = `<tr><td colspan="6">
+        <div class="empty-state">No articles found.<p>Try adjusting your filters.</p></div>
+      </td></tr>`;
+            } else {
+                tbody.innerHTML = data.articles.map(a => `
+        <tr>
+          <td title="${(a.titre || "").replace(/"/g, "&quot;")}">
+            ${(a.titre || "").substring(0, 80)}${(a.titre || "").length > 80 ? "..." : ""}
+          </td>
+          <td>${a.maladie || "—"}</td>
+          <td>${sourceTag(a.source)}</td>
+          <td>${(a.journal || "—").substring(0, 30)}</td>
+          <td>${a.date_publication || "—"}</td>
+          <td>${a.lien ? `<a href="${a.lien}" target="_blank" rel="noopener">Open</a>` : "—"}</td>
+        </tr>
+      `).join("");
+            }
+
+            const totalPages = Math.ceil(data.total / PER_PAGE);
+            document.getElementById("pageInfo").textContent =
+                `Page ${currentPage} of ${totalPages} (${data.total.toLocaleString()} articles)`;
+            document.getElementById("btnPrev").disabled = currentPage <= 1;
+            document.getElementById("btnNext").disabled = currentPage >= totalPages;
+        }
+
+        async function loadFilterOptions() {
+            const [byDisease, bySource] = await Promise.all([
+                fetchJSON("/api/by_disease"),
+                fetchJSON("/api/by_source"),
+            ]);
+            const diseaseSelect = document.getElementById("filterDisease");
+            byDisease.labels.forEach(d => {
+                const o = document.createElement("option");
+                o.value = d; o.textContent = d;
+                diseaseSelect.appendChild(o);
+            });
+            const sourceSelect = document.getElementById("filterSource");
+            bySource.labels.forEach(s => {
+                const o = document.createElement("option");
+                o.value = s; o.textContent = s;
+                sourceSelect.appendChild(o);
+            });
+        }
+
+        document.getElementById("btnPrev").addEventListener("click", () => { currentPage--; loadArticles(); });
+        document.getElementById("btnNext").addEventListener("click", () => { currentPage++; loadArticles(); });
+
+        let debounceTimer;
+        document.getElementById("searchInput").addEventListener("input", () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => { currentPage = 1; loadArticles(); }, 400);
+        });
+        document.getElementById("filterDisease").addEventListener("change", () => { currentPage = 1; loadArticles(); });
+        document.getElementById("filterSource").addEventListener("change", () => { currentPage = 1; loadArticles(); });
+
+        // Boot
+        Promise.all([
+            loadOverview(),
+            loadDiseaseChart(),
+            loadSourceChart(),
+            loadTimelineChart(),
+            loadContentTypeChart(),
+            loadKeywordsChart(),
+            loadHeatmapChart(),
+            loadFilterOptions(),
+            loadArticles(),
+        ]);
+    </script>
+</body>
+
+</html>

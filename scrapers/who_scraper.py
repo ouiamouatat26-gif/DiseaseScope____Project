@@ -6,34 +6,37 @@ import time
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["articles_who"]
-maladies = [
+
+DISEASES = [
     "cancer", "diabetes", "alzheimer", "heart disease",
     "neurological diseases", "respiratory diseases",
     "eye diseases", "digestive diseases",
-    "infectious diseases", "autoimmune diseases"
+    "infectious diseases", "autoimmune diseases",
 ]
+
 session = requests.Session()
 session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Accept": "application/json",
-    "Referer": "https://iris.who.int/"
+    "Referer": "https://iris.who.int/",
 })
 
-def scraper_who(maladie):
-    print(f"\n Scraping WHO : {maladie}")
+
+def scrape_who(disease):
+    print(f"Scraping WHO: {disease}")
 
     try:
         session.get("https://iris.who.int/", timeout=10)
         time.sleep(1)
-    except:
+    except Exception:
         pass
 
     url = "https://iris.who.int/server/api/discover/search/objects"
     params = {
-        "query": maladie,
+        "query": disease,
         "page": 0,
         "size": 100,
-        "sort": "score,DESC"
+        "sort": "score,DESC",
     }
 
     try:
@@ -41,7 +44,7 @@ def scraper_who(maladie):
         r.raise_for_status()
         data = r.json()
     except Exception as e:
-        print(f"   Erreur : {e}")
+        print(f"  Error: {e}")
         return 0
 
     objects = (
@@ -50,9 +53,9 @@ def scraper_who(maladie):
         .get("_embedded", {})
         .get("objects", [])
     )
-    print(f"   {len(objects)} articles trouves")
+    print(f"  {len(objects)} articles found")
 
-    sauvegardes = 0
+    saved = 0
     for obj in objects:
         try:
             item = obj.get("_embedded", {}).get("indexableObject", {})
@@ -62,51 +65,54 @@ def scraper_who(maladie):
 
             metadata_list = item.get("metadata", {})
             meta = {
-                cle: [v.get("value", "") for v in valeurs]
-                for cle, valeurs in metadata_list.items()
+                key: [v.get("value", "") for v in values]
+                for key, values in metadata_list.items()
             }
 
-            identifiants = meta.get("dc.identifier.uri", [])
-            lien = next((i for i in identifiants if i.startswith("http")), "")
-            titre = meta.get("dc.title", ["Sans titre"])[0]
-            resume = meta.get("dc.description.abstract", [""])[0]
-            if not resume:
+            identifiers = meta.get("dc.identifier.uri", [])
+            link = next((i for i in identifiers if i.startswith("http")), "")
+            title = meta.get("dc.title", ["Untitled"])[0]
+            abstract = meta.get("dc.description.abstract", [""])[0]
+            if not abstract:
                 descriptions = meta.get("dc.description", [])
-                resume = descriptions[0] if descriptions else titre
-            mots_cles = meta.get("dc.subject", [])
-            if maladie not in mots_cles:
-                mots_cles.append(maladie)
+                abstract = descriptions[0] if descriptions else title
+
+            keywords = meta.get("dc.subject", [])
+            if disease not in keywords:
+                keywords.append(disease)
 
             doc = {
-                "titre": titre,
-                "resume": resume,
+                "titre": title,
+                "resume": abstract,
                 "auteurs": meta.get("dc.contributor.author", []) or ["WHO"],
-                "date_publication": meta.get("dc.date.issued", ["Inconnue"])[0],
+                "date_publication": meta.get("dc.date.issued", ["Unknown"])[0],
                 "journal": meta.get("dc.publisher", ["WHO"])[0],
-                "mots_cles": mots_cles,
-                "maladie": maladie,
+                "mots_cles": keywords,
+                "maladie": disease,
                 "source": "WHO",
-                "lien": lien,
+                "lien": link,
                 "type_contenu": "non_classifie",
-                "date_scraping": datetime.now()
+                "date_scraping": datetime.now(),
             }
 
-            if not collection.find_one({"lien": lien}) and lien:
+            if not collection.find_one({"lien": link}) and link:
                 collection.insert_one(doc)
-                sauvegardes += 1
-        except Exception as e:
+                saved += 1
+
+        except Exception:
             continue
 
-    print(f"   {sauvegardes} sauvegardes")
+    print(f"  {saved} saved")
     time.sleep(2)
-    return sauvegardes
+    return saved
+
 
 if __name__ == "__main__":
-    print("WHO Scraper ")
+    print("=== WHO Scraper ===")
     total = 0
-    for m in maladies:
-        total += scraper_who(m)
-    print(f"\nTotal : {total}")
-    print(f"MongoDB : {collection.count_documents({})}")
-    for m in maladies:
-        print(f"   {m} : {collection.count_documents({'maladie': m})}")
+    for d in DISEASES:
+        total += scrape_who(d)
+    print(f"\nTotal saved: {total}")
+    print(f"Total in MongoDB: {collection.count_documents({})}")
+    for d in DISEASES:
+        print(f"  {d}: {collection.count_documents({'maladie': d})}")

@@ -1,4 +1,3 @@
-
 import requests
 from pymongo import MongoClient
 from datetime import datetime
@@ -9,125 +8,127 @@ client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["articles_pubmed"]
 
-maladies = [
+DISEASES = [
     "cancer", "diabetes", "alzheimer", "heart disease",
     "neurological diseases", "respiratory diseases",
     "eye diseases", "digestive diseases",
-    "infectious diseases", "autoimmune diseases"
+    "infectious diseases", "autoimmune diseases",
 ]
 
-def scraper_pubmed(maladie):
-    print(f"\n🔍 Scraping PubMed : {maladie}")
 
-    # Étape 1 : récupérer les IDs
-    r = requests.get(
+def scrape_pubmed(disease):
+    print(f"Scraping PubMed: {disease}")
+
+    response = requests.get(
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-        params={"db": "pubmed", "term": maladie, "retmax": 200,
-                "retmode": "json", "sort": "date"},
-        timeout=15
+        params={
+            "db": "pubmed",
+            "term": disease,
+            "retmax": 200,
+            "retmode": "json",
+            "sort": "date",
+        },
+        timeout=15,
     )
-    ids = r.json()["esearchresult"]["idlist"]
-    print(f"   → {len(ids)} articles trouvés")
+    ids = response.json()["esearchresult"]["idlist"]
+    print(f"  {len(ids)} articles found")
     if not ids:
         return 0
 
-    # Étape 2 : récupérer résumés + détails via efetch (XML)
-    r2 = requests.get(
+    response2 = requests.get(
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-        params={"db": "pubmed", "id": ",".join(ids),
-                "retmode": "xml", "rettype": "abstract"},
-        timeout=30
+        params={
+            "db": "pubmed",
+            "id": ",".join(ids),
+            "retmode": "xml",
+            "rettype": "abstract",
+        },
+        timeout=30,
     )
 
     try:
-        root = ET.fromstring(r2.text)
-    except:
-        print("   ❌ Erreur parsing XML")
+        root = ET.fromstring(response2.text)
+    except ET.ParseError as e:
+        print(f"  XML parsing error: {e}")
         return 0
 
-    sauvegardes = 0
+    saved = 0
     for article in root.findall(".//PubmedArticle"):
         try:
-            # Titre
-            titre_el = article.find(".//ArticleTitle")
-            titre = titre_el.text if titre_el is not None else ""
-            if not titre:
+            title_el = article.find(".//ArticleTitle")
+            title = title_el.text if title_el is not None else ""
+            if not title:
                 continue
 
-            # Résumé
-            resume_parts = article.findall(".//AbstractText")
-            resume = " ".join([p.text for p in resume_parts if p.text])
-            if not resume:
-                resume = titre
+            abstract_parts = article.findall(".//AbstractText")
+            abstract = " ".join([p.text for p in abstract_parts if p.text])
+            if not abstract:
+                abstract = title
 
-            # Auteurs
-            auteurs = []
+            authors = []
             for author in article.findall(".//Author"):
                 last = author.find("LastName")
                 first = author.find("ForeName")
                 if last is not None:
-                    nom = last.text
+                    name = last.text
                     if first is not None:
-                        nom += " " + first.text
-                    auteurs.append(nom)
+                        name += " " + first.text
+                    authors.append(name)
 
-            # Date
             pub_date = article.find(".//PubDate")
-            annee = pub_date.find("Year").text if pub_date is not None and pub_date.find("Year") is not None else ""
-            mois = pub_date.find("Month").text if pub_date is not None and pub_date.find("Month") is not None else ""
-            date_pub = f"{annee}-{mois}" if annee else "Inconnue"
+            year = pub_date.find("Year").text if pub_date is not None and pub_date.find("Year") is not None else ""
+            month = pub_date.find("Month").text if pub_date is not None and pub_date.find("Month") is not None else ""
+            publication_date = f"{year}-{month}" if year else "Unknown"
 
-            # Journal
             journal_el = article.find(".//Journal/Title")
-            journal = journal_el.text if journal_el is not None else "Inconnu"
+            journal = journal_el.text if journal_el is not None else "Unknown"
 
-            # Mots-clés
-            mots_cles = [kw.text for kw in article.findall(".//Keyword") if kw.text]
-            if not mots_cles:
-                mots_cles = [
+            keywords = [kw.text for kw in article.findall(".//Keyword") if kw.text]
+            if not keywords:
+                keywords = [
                     mh.find("DescriptorName").text
                     for mh in article.findall(".//MeshHeading")
                     if mh.find("DescriptorName") is not None and mh.find("DescriptorName").text
                 ]
-            if maladie not in mots_cles:
-                mots_cles.append(maladie)
+            if disease not in keywords:
+                keywords.append(disease)
 
-            # PMID
             pmid_el = article.find(".//PMID")
             pmid = pmid_el.text if pmid_el is not None else ""
-            lien = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+            link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
 
             doc = {
-                "titre": titre,
-                "resume": resume,
-                "auteurs": auteurs,
-                "date_publication": date_pub,
+                "titre": title,
+                "resume": abstract,
+                "auteurs": authors,
+                "date_publication": publication_date,
                 "journal": journal,
-                "mots_cles": mots_cles,
-                "maladie": maladie,
+                "mots_cles": keywords,
+                "maladie": disease,
                 "source": "PubMed",
-                "lien": lien,
+                "lien": link,
                 "type_contenu": "non_classifie",
-                "date_scraping": datetime.now()
+                "date_scraping": datetime.now(),
             }
 
-            if not collection.find_one({"lien": lien}):
+            if not collection.find_one({"lien": link}):
                 collection.insert_one(doc)
-                sauvegardes += 1
+                saved += 1
 
-        except Exception as e:
+        except Exception:
             continue
 
     time.sleep(1)
-    print(f"   ✅ {sauvegardes} sauvegardés")
-    return sauvegardes
+    print(f"  {saved} saved")
+    return saved
+
 
 if __name__ == "__main__":
     print("=== PubMed Scraper ===")
     total = 0
-    for m in maladies:
-        total += scraper_pubmed(m)
-    print(f"\nTotal : {total}")
-    print(f"MongoDB : {collection.count_documents({})}")
-    for m in maladies:
-        print(f"   {m} : {collection.count_documents({'maladie': m})}")
+    for d in DISEASES:
+        total += scrape_pubmed(d)
+    print(f"\nTotal saved: {total}")
+    print(f"Total in MongoDB: {collection.count_documents({})}")
+    for d in DISEASES:
+        print(f"  {d}: {collection.count_documents({'maladie': d})}")

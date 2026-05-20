@@ -6,83 +6,89 @@ import time
 client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["clinical_trials"]
-maladies = [
+
+DISEASES = [
     "cancer", "diabetes", "alzheimer", "heart disease",
     "neurological diseases", "respiratory diseases",
     "eye diseases", "digestive diseases",
-    "infectious diseases", "autoimmune diseases"
+    "infectious diseases", "autoimmune diseases",
 ]
-def scraper_clinical_trials(maladie):
-    print(f"\n Scraping ClinicalTrials : {maladie}")
+
+
+def scrape_clinical_trials(disease):
+    print(f"Scraping ClinicalTrials: {disease}")
 
     url = "https://clinicaltrials.gov/api/v2/studies"
     params = {
-        "query.cond": maladie,
+        "query.cond": disease,
         "pageSize": 200,
-        "format": "json"
+        "format": "json",
     }
 
     try:
         r = requests.get(url, params=params, timeout=15)
         r.raise_for_status()
-        etudes = r.json().get("studies", [])
-        print(f"   {len(etudes)} essais trouves")
+        studies = r.json().get("studies", [])
+        print(f"  {len(studies)} trials found")
     except Exception as e:
-        print(f"   Erreur : {e}")
+        print(f"  Error: {e}")
         return 0
 
-    sauvegardes = 0
-    for etude in etudes:
+    saved = 0
+    for study in studies:
         try:
-            proto = etude.get("protocolSection", {})
+            proto = study.get("protocolSection", {})
             id_mod = proto.get("identificationModule", {})
-            statut_mod = proto.get("statusModule", {})
+            status_mod = proto.get("statusModule", {})
             desc_mod = proto.get("descriptionModule", {})
             cond_mod = proto.get("conditionsModule", {})
             sponsor_mod = proto.get("sponsorCollaboratorsModule", {})
             contacts_mod = proto.get("contactsLocationsModule", {})
 
             nct_id = id_mod.get("nctId", "")
-            lien = f"https://clinicaltrials.gov/study/{nct_id}"
+            link = f"https://clinicaltrials.gov/study/{nct_id}"
             sponsor = sponsor_mod.get("leadSponsor", {}).get("name", "ClinicalTrials")
-            responsables = []
+
+            contacts = []
             for contact in contacts_mod.get("centralContacts", []):
-                nom = contact.get("name", "").strip()
-                if nom:
-                    responsables.append(nom)
-            if not responsables and sponsor:
-                responsables = [sponsor]
+                name = contact.get("name", "").strip()
+                if name:
+                    contacts.append(name)
+            if not contacts and sponsor:
+                contacts = [sponsor]
 
             doc = {
-                "titre": id_mod.get("briefTitle", "Sans titre"),
+                "titre": id_mod.get("briefTitle", "Untitled"),
                 "resume": desc_mod.get("briefSummary") or id_mod.get("briefTitle", ""),
-                "auteurs": responsables,
-                "date_publication": statut_mod.get("startDateStruct", {}).get("date", "Inconnue"),
+                "auteurs": contacts,
+                "date_publication": status_mod.get("startDateStruct", {}).get("date", "Unknown"),
                 "journal": sponsor,
                 "mots_cles": cond_mod.get("conditions", []),
-                "maladie": maladie,
+                "maladie": disease,
                 "source": "ClinicalTrials",
-                "lien": lien,
+                "lien": link,
                 "type_contenu": "non_classifie",
-                "date_scraping": datetime.now()
+                "date_scraping": datetime.now(),
             }
 
-            if not collection.find_one({"lien": lien}):
+            if not collection.find_one({"lien": link}):
                 collection.insert_one(doc)
-                sauvegardes += 1
-        except Exception as e:
+                saved += 1
+
+        except Exception:
             continue
 
-    print(f"   {sauvegardes} sauvegardes")
+    print(f"  {saved} saved")
     time.sleep(1)
-    return sauvegardes
+    return saved
+
 
 if __name__ == "__main__":
     print("=== ClinicalTrials Scraper ===")
     total = 0
-    for m in maladies:
-        total += scraper_clinical_trials(m)
-    print(f"\nTotal : {total}")
-    print(f"MongoDB : {collection.count_documents({})}")
-    for m in maladies:
-        print(f"   {m} : {collection.count_documents({'maladie': m})}")
+    for d in DISEASES:
+        total += scrape_clinical_trials(d)
+    print(f"\nTotal saved: {total}")
+    print(f"Total in MongoDB: {collection.count_documents({})}")
+    for d in DISEASES:
+        print(f"  {d}: {collection.count_documents({'maladie': d})}")

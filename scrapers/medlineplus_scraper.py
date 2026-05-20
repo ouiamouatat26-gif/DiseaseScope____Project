@@ -1,5 +1,5 @@
 import requests
-from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
 from pymongo import MongoClient
 from datetime import datetime
 import time
@@ -8,105 +8,96 @@ client = MongoClient("mongodb://localhost:27017/")
 db = client["diseasescope"]
 collection = db["articles_medlineplus"]
 
-maladies = {
-    "cancer": "cancer",
-    "diabetes": "diabetes",
-    "alzheimer": "alzheimer",
-    "heart disease": "heartdisease",
-    "neurological diseases": "neurologicdiseases",
-    "respiratory diseases": "respiratorydiseases",
-    "eye diseases": "eyediseases",
-    "digestive diseases": "digestivediseases",
-    "infectious diseases": "infectiousdiseases",
-    "autoimmune diseases": "autoimmunediseases"
-}
+DISEASES = [
+    "cancer", "diabetes", "alzheimer", "heart disease",
+    "neurological diseases", "respiratory diseases",
+    "eye diseases", "digestive diseases",
+    "infectious diseases", "autoimmune diseases",
+]
 
-headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+API_URL = "https://wsearch.nlm.nih.gov/ws/query"
 
-def scraper_medlineplus(maladie, terme):
-    print(f"\n🔍 Scraping MedlinePlus : {maladie}")
 
-    url = f"https://medlineplus.gov/{terme}.html"
-    sauvegardes = 0
+def scrape_medlineplus(disease):
+    print(f"Scraping MedlinePlus: {disease}")
+
+    params = {
+        "db": "healthTopics",
+        "term": disease,
+        "retmax": 100,
+    }
 
     try:
-        r = requests.get(url, headers=headers, timeout=15)
-        soup = BeautifulSoup(r.content, "html.parser")
+        r = requests.get(API_URL, params=params, timeout=15)
+        r.raise_for_status()
+        root = ET.fromstring(r.text)
     except Exception as e:
-        print(f"   ❌ Erreur : {e}")
+        print(f"  Error: {e}")
         return 0
 
-    # Récupérer tous les liens d'articles dans la page
-    tous_liens = []
-    for a in soup.find_all("a", href=True):
-        href = a.get("href", "")
-        texte = a.text.strip()
-        if len(texte) > 20 and ("medlineplus.gov" in href or href.startswith("/")):
-            if not href.startswith("http"):
-                href = "https://medlineplus.gov" + href
-            tous_liens.append((texte, href))
+    documents = root.findall(".//document")
+    print(f"  {len(documents)} documents found")
 
-    print(f"   → {len(tous_liens)} liens trouvés")
-
-    for texte, lien in tous_liens[:50]:
+    saved = 0
+    for doc in documents:
         try:
-            if collection.find_one({"lien": lien}):
+            link = doc.get("url", "")
+            if not link:
                 continue
 
-            # Aller chercher le contenu de chaque page
-            r2 = requests.get(lien, headers=headers, timeout=10)
-            soup2 = BeautifulSoup(r2.content, "html.parser")
+            def get_content(tag):
+                el = doc.find(f".//content[@name='{tag}']")
+                return el.text.strip() if el is not None and el.text else ""
 
-            # Chercher le résumé
-            resume = ""
-            for div_id in ["topic-summary", "toc", "ency-content"]:
-                div = soup2.find("div", {"id": div_id})
-                if div:
-                    paragraphes = div.find_all("p")
-                    resume = " ".join([p.text.strip() for p in paragraphes if len(p.text.strip()) > 30])
-                    break
-
-            if not resume:
-                body = soup2.find("main") or soup2.find("article")
-                if body:
-                    paragraphes = body.find_all("p")
-                    resume = " ".join([p.text.strip() for p in paragraphes[:5] if len(p.text.strip()) > 30])
-
-            if not resume:
+            title = get_content("title")
+            if not title:
                 continue
 
-            doc = {
-                "titre": texte,
-                "resume": resume[:2000],
+            abstract = get_content("FullSummary") or get_content("snippet") or title
+            abstract = " ".join(ET.fromstring(f"<x>{abstract}</x>").itertext()).strip()
+
+            mesh_terms = [
+                el.text.strip()
+                for el in doc.findall(".//content[@name='mesh']")
+                if el.text
+            ]
+            if disease not in mesh_terms:
+                mesh_terms.append(disease)
+
+            date_updated = get_content("dateUpdated") or datetime.now().strftime("%Y-%m-%d")
+
+            record = {
+                "titre": title,
+                "resume": abstract[:3000],
                 "auteurs": ["MedlinePlus Editorial Team"],
-                "date_publication": datetime.now().strftime("%Y-%m-%d"),
+                "date_publication": date_updated,
                 "journal": "MedlinePlus",
-                "mots_cles": [maladie],
-                "maladie": maladie,
+                "mots_cles": mesh_terms,
+                "maladie": disease,
                 "source": "MedlinePlus",
-                "lien": lien,
+                "lien": link,
                 "type_contenu": "non_classifie",
-                "date_scraping": datetime.now()
+                "date_scraping": datetime.now(),
             }
 
-            collection.insert_one(doc)
-            sauvegardes += 1
-            print(f"   ✅ {texte[:55]}...")
-            time.sleep(0.5)
+            if not collection.find_one({"lien": link}):
+                collection.insert_one(record)
+                saved += 1
 
-        except Exception as e:
+        except Exception:
             continue
 
-    print(f"   📦 {sauvegardes} articles sauvegardés")
-    time.sleep(2)
-    return sauvegardes
+    print(f"  {saved} articles saved")
+    time.sleep(1)
+    return saved
+
 
 if __name__ == "__main__":
     print("=== MedlinePlus Scraper ===")
     total = 0
-    for maladie, terme in maladies.items():
-        total += scraper_medlineplus(maladie, terme)
-    print(f"\n✅ Total : {total}")
-    print(f"📊 MongoDB : {collection.count_documents({})}")
-    for m in maladies:
-        print(f"   {m} : {collection.count_documents({'maladie': m})}")
+    for d in DISEASES:
+        total += scrape_medlineplus(d)
+    print(f"\nTotal saved: {total}")
+    print(f"Total in MongoDB: {collection.count_documents({})}")
+    for d in DISEASES:
+        print(f"  {d}: {collection.count_documents({'maladie': d})}")
