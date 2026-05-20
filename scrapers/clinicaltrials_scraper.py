@@ -40,16 +40,25 @@ def scraper_clinical_trials(maladie):
             desc_mod = proto.get("descriptionModule", {})
             cond_mod = proto.get("conditionsModule", {})
             sponsor_mod = proto.get("sponsorCollaboratorsModule", {})
+            contacts_mod = proto.get("contactsLocationsModule", {})
 
             nct_id = id_mod.get("nctId", "")
             lien = f"https://clinicaltrials.gov/study/{nct_id}"
+            sponsor = sponsor_mod.get("leadSponsor", {}).get("name", "ClinicalTrials")
+            responsables = []
+            for contact in contacts_mod.get("centralContacts", []):
+                nom = contact.get("name", "").strip()
+                if nom:
+                    responsables.append(nom)
+            if not responsables and sponsor:
+                responsables = [sponsor]
 
             doc = {
                 "titre": id_mod.get("briefTitle", "Sans titre"),
-                "resume": desc_mod.get("briefSummary", ""),
-                "auteurs": [],
+                "resume": desc_mod.get("briefSummary") or id_mod.get("briefTitle", ""),
+                "auteurs": responsables,
                 "date_publication": statut_mod.get("startDateStruct", {}).get("date", "Inconnue"),
-                "journal": sponsor_mod.get("leadSponsor", {}).get("leadSponsorName", "Inconnu"),
+                "journal": sponsor,
                 "mots_cles": cond_mod.get("conditions", []),
                 "maladie": maladie,
                 "source": "ClinicalTrials",

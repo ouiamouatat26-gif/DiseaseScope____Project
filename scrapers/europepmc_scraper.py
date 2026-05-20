@@ -44,7 +44,14 @@ def scraper_europe_pmc(maladie):
             auteurs = [
                 f"{a.get('firstName', '')} {a.get('lastName', '')}".strip()
                 for a in auteur_list
+                if f"{a.get('firstName', '')} {a.get('lastName', '')}".strip()
             ]
+            if not auteurs and article.get("authorString"):
+                auteurs = [a.strip() for a in article.get("authorString", "").split(",") if a.strip()]
+
+            mots_cles = article.get("keywordList", {}).get("keyword", [])
+            if maladie not in mots_cles:
+                mots_cles.append(maladie)
 
             if pmid:
                 lien = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
@@ -55,11 +62,11 @@ def scraper_europe_pmc(maladie):
 
             doc = {
                 "titre": article.get("title", "Sans titre"),
-                "resume": article.get("abstractText", ""),
+                "resume": article.get("abstractText") or article.get("title", ""),
                 "auteurs": auteurs,
                 "date_publication": article.get("firstPublicationDate", "Inconnue"),
                 "journal": article.get("journalTitle", "Inconnu"),
-                "mots_cles": article.get("keywordList", {}).get("keyword", []),
+                "mots_cles": mots_cles,
                 "maladie": maladie,
                 "source": "Europe PMC",
                 "lien": lien,

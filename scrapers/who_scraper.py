@@ -68,14 +68,22 @@ def scraper_who(maladie):
 
             identifiants = meta.get("dc.identifier.uri", [])
             lien = next((i for i in identifiants if i.startswith("http")), "")
+            titre = meta.get("dc.title", ["Sans titre"])[0]
+            resume = meta.get("dc.description.abstract", [""])[0]
+            if not resume:
+                descriptions = meta.get("dc.description", [])
+                resume = descriptions[0] if descriptions else titre
+            mots_cles = meta.get("dc.subject", [])
+            if maladie not in mots_cles:
+                mots_cles.append(maladie)
 
             doc = {
-                "titre": meta.get("dc.title", ["Sans titre"])[0],
-                "resume": meta.get("dc.description.abstract", [""])[0],
-                "auteurs": meta.get("dc.contributor.author", []),
+                "titre": titre,
+                "resume": resume,
+                "auteurs": meta.get("dc.contributor.author", []) or ["WHO"],
                 "date_publication": meta.get("dc.date.issued", ["Inconnue"])[0],
                 "journal": meta.get("dc.publisher", ["WHO"])[0],
-                "mots_cles": meta.get("dc.subject", []),
+                "mots_cles": mots_cles,
                 "maladie": maladie,
                 "source": "WHO",
                 "lien": lien,
