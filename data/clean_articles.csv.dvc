@@ -1,0 +1,5 @@
+outs:
+- md5: 7f6afe07aaa67d6fe24bdef4ac6a6922
+  size: 8428074
+  hash: md5
+  path: clean_articles.csv
