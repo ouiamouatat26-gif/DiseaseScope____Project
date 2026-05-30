@@ -97,6 +97,13 @@ def scrape_pubmed(disease):
             pmid = pmid_el.text if pmid_el is not None else ""
             link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
 
+            # Extract publication type
+            pub_types = []
+            for pt in article.findall(".//PublicationType"):
+                if pt.text:
+                    pub_types.append(pt.text.lower().replace(" ", "_"))
+            type_contenu = pub_types[0] if pub_types else "non_classifie"
+
             doc = {
                 "titre": title,
                 "resume": abstract,
@@ -107,7 +114,7 @@ def scrape_pubmed(disease):
                 "maladie": disease,
                 "source": "PubMed",
                 "lien": link,
-                "type_contenu": "non_classifie",
+                "type_contenu": type_contenu,
                 "date_scraping": datetime.now(),
             }
 
