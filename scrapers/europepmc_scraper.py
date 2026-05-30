@@ -62,13 +62,6 @@ def scrape_europe_pmc(disease):
             else:
                 link = ""
 
-            # Extract publication type
-            pub_types = article.get("pubTypeList", {}).get("pubType", [])
-            if isinstance(pub_types, list):
-                type_contenu = pub_types[0].lower().replace(" ", "_") if pub_types else "non_classifie"
-            else:
-                type_contenu = str(pub_types).lower().replace(" ", "_") if pub_types else "non_classifie"
-
             doc = {
                 "titre": article.get("title", "Untitled"),
                 "resume": article.get("abstractText") or article.get("title", ""),
@@ -79,7 +72,7 @@ def scrape_europe_pmc(disease):
                 "maladie": disease,
                 "source": "Europe PMC",
                 "lien": link,
-                "type_contenu": type_contenu,
+                "type_contenu": "non_classifie",
                 "date_scraping": datetime.now(),
             }
 
@@ -97,9 +90,6 @@ def scrape_europe_pmc(disease):
 
 if __name__ == "__main__":
     print("=== Europe PMC Scraper ===")
-    # Clear collection to get fresh data with publication types
-    collection.delete_many({})
-    print("Cleared existing Europe PMC collection")
     total = 0
     for d in DISEASES:
         total += scrape_europe_pmc(d)
