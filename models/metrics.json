@@ -1,0 +1,10 @@
+{
+  "accuracy": 83.87,
+  "classes": [
+    "diagnosis",
+    "prevention",
+    "research",
+    "treatment"
+  ],
+  "n_articles": 5704
+}
