@@ -30,7 +30,7 @@ model.fit(X_train, y_train)
 
 y_pred = model.predict(X_test)
 acc = accuracy_score(y_test, y_pred)
-print(f"\n✅ Accuracy : {round(acc*100, 2)}%")
+print(f"\n Accuracy : {round(acc*100, 2)}%")
 print(classification_report(y_test, y_pred, target_names=le.classes_))
 
 # Créer le dossier "models" s'il n'existe pas
