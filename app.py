@@ -8,9 +8,7 @@ import re
 import json
 from io import BytesIO
 
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
+
 st.set_page_config(
     page_title="DiseaseScope — Medical Research Intelligence",
     page_icon="🧬",
@@ -18,12 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============================================================
-# THEME DETECTION — Light / Dark / Auto
-# ============================================================
-# Streamlit exposes CSS custom properties. We use a JS snippet to detect
-# the active theme and store it in session_state so Python can react.
-# This is the most reliable cross-platform approach (works on Cloud & local).
+
 
 theme_js = """
 <script>
@@ -38,17 +31,6 @@ theme_js = """
 </script>
 """
 
-# We inject a hidden HTML element that reports the theme via a workaround
-# Since we can't use JS components easily, we rely on CSS media queries
-# and the fact that Streamlit's dark mode sets specific body classes.
-# The robust way: use CSS variables that adapt automatically.
-
-# ============================================================
-# DESIGN SYSTEM — Minimalist, Adaptive Light/Dark
-# ============================================================
-# We define colors that work beautifully in BOTH modes using CSS vars
-# and override only where necessary. The palette is restrained:
-# one primary accent (teal), subtle grays, and high-contrast text.
 
 st.markdown("""
 <style>
@@ -487,11 +469,11 @@ st.markdown("""
 @st.cache_data(ttl=3600)
 def load_data():
     try:
-        df = pd.read_csv("data/articles_etiquetes.csv", encoding="utf-8-sig")
+        df = pd.read_csv("data/articles_classifies.csv", encoding="utf-8-sig")
         df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
     except FileNotFoundError:
-        st.error("Fichier `data/articles_etiquetes.csv` non trouvé. Veuillez exécuter le pipeline de classification.")
+        st.error("Fichier `data/articles_classifies.csv` non trouvé. Veuillez exécuter le pipeline de classification.")
         return pd.DataFrame()
 
 @st.cache_resource

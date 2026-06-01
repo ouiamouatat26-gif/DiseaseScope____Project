@@ -1,10 +1,12 @@
 {
-  "accuracy": 83.87,
+  "accuracy": 50.0,
   "classes": [
-    "diagnosis",
+    "diagnostic",
+    "other",
     "prevention",
     "research",
     "treatment"
   ],
-  "n_articles": 5704
+  "n_articles": 100,
+  "stratified": true
 }
