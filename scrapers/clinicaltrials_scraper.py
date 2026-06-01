@@ -21,7 +21,7 @@ def scrape_clinical_trials(disease):
     url = "https://clinicaltrials.gov/api/v2/studies"
     params = {
         "query.cond": disease,
-        "pageSize": 200,
+        "pageSize": 1000,
         "format": "json",
     }
 

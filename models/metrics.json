@@ -1,12 +1,15 @@
 {
-  "accuracy": 50.0,
+  "accuracy": 73.29,
   "classes": [
-    "diagnostic",
-    "other",
+    "basic_research",
+    "bioinformatics",
+    "clinical_case",
+    "diagnosis",
+    "epidemiology",
+    "health_economics",
     "prevention",
-    "research",
     "treatment"
   ],
-  "n_articles": 100,
+  "n_articles_train": 3500,
   "stratified": true
 }

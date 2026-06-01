@@ -24,7 +24,7 @@ def scrape_medlineplus(disease):
     params = {
         "db": "healthTopics",
         "term": disease,
-        "retmax": 100,
+        "retmax": 500,  
     }
 
     try:
@@ -93,11 +93,13 @@ def scrape_medlineplus(disease):
 
 
 if __name__ == "__main__":
-    print("=== MedlinePlus Scraper ===")
+    print("=== MedlinePlus Scraper (Version Corrigée) ===")
     total = 0
     for d in DISEASES:
         total += scrape_medlineplus(d)
-    print(f"\nTotal saved: {total}")
-    print(f"Total in MongoDB: {collection.count_documents({})}")
+    print(f"\n==================================================")
+    print(f"Total saved in this session: {total}")
+    print(f"Total in MongoDB collection: {collection.count_documents({})}")
+    print(f"==================================================")
     for d in DISEASES:
         print(f"  {d}: {collection.count_documents({'maladie': d})}")

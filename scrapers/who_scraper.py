@@ -32,87 +32,108 @@ def scrape_who(disease):
         pass
 
     url = "https://iris.who.int/server/api/discover/search/objects"
-    params = {
-        "query": disease,
-        "page": 0,
-        "size": 100,
-        "sort": "score,DESC",
-    }
-
-    try:
-        r = session.get(url, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        print(f"  Error: {e}")
-        return 0
-
-    objects = (
-        data.get("_embedded", {})
-        .get("searchResult", {})
-        .get("_embedded", {})
-        .get("objects", [])
-    )
-    print(f"  {len(objects)} articles found")
-
     saved = 0
-    for obj in objects:
+    
+    # Boucle de pagination pour récupérer 3 pages de 100 résultats (Total : 300 par maladie)
+    for page in range(3):
+        print(f"  -> Extraction de la page {page}...")
+        params = {
+            "query": disease,
+            "page": page,
+            "size": 100,
+            "sort": "score,DESC",
+        }
+
         try:
-            item = obj.get("_embedded", {}).get("indexableObject", {})
-            uuid = item.get("uuid", "")
-            if not uuid:
+            r = session.get(url, params=params, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            print(f"     Erreur lors de la requête (Page {page}): {e}")
+            break
+
+        objects = (
+            data.get("_embedded", {})
+            .get("searchResult", {})
+            .get("_embedded", {})
+            .get("objects", [])
+        )
+        
+        # Si la page est vide, on arrête de boucler pour cette maladie
+        if not objects:
+            print(f"     Pas d'autres articles trouvés sur la page {page}.")
+            break
+
+        print(f"     {len(objects)} documents trouvés sur cette page.")
+
+        for obj in objects:
+            try:
+                item = obj.get("_embedded", {}).get("indexableObject", {})
+                uuid = item.get("uuid", "")
+                if not uuid:
+                    continue
+
+                metadata_list = item.get("metadata", {})
+                meta = {
+                    key: [v.get("value", "") for v in values]
+                    for key, values in metadata_list.items()
+                }
+
+                identifiers = meta.get("dc.identifier.uri", [])
+                link = next((i for i in identifiers if i.startswith("http")), "")
+                title = meta.get("dc.title", ["Untitled"])[0]
+                abstract = meta.get("dc.description.abstract", [""])[0]
+                
+                if not abstract:
+                    descriptions = meta.get("dc.description", [])
+                    abstract = descriptions[0] if descriptions else title
+
+                keywords = meta.get("dc.subject", [])
+                if disease not in keywords:
+                    keywords.append(disease)
+
+                doc = {
+                    "titre": title,
+                    "resume": abstract,
+                    "auteurs": meta.get("dc.contributor.author", []) or ["WHO"],
+                    "date_publication": meta.get("dc.date.issued", ["Unknown"])[0],
+                    "journal": meta.get("dc.publisher", ["WHO"])[0],
+                    "mots_cles": keywords,
+                    "maladie": disease,
+                    "source": "WHO",
+                    "lien": link,
+                    "type_contenu": "non_classifie",
+                    "date_scraping": datetime.now(),
+                }
+
+                # Insertion unique basée sur le lien
+                if link and not collection.find_one({"lien": link}):
+                    collection.insert_one(doc)
+                    saved += 1
+
+            except Exception:
                 continue
 
-            metadata_list = item.get("metadata", {})
-            meta = {
-                key: [v.get("value", "") for v in values]
-                for key, values in metadata_list.items()
-            }
+        # Petite pause de sécurité entre les pages pour éviter le blocage IP
+        time.sleep(1.5)
 
-            identifiers = meta.get("dc.identifier.uri", [])
-            link = next((i for i in identifiers if i.startswith("http")), "")
-            title = meta.get("dc.title", ["Untitled"])[0]
-            abstract = meta.get("dc.description.abstract", [""])[0]
-            if not abstract:
-                descriptions = meta.get("dc.description", [])
-                abstract = descriptions[0] if descriptions else title
-
-            keywords = meta.get("dc.subject", [])
-            if disease not in keywords:
-                keywords.append(disease)
-
-            doc = {
-                "titre": title,
-                "resume": abstract,
-                "auteurs": meta.get("dc.contributor.author", []) or ["WHO"],
-                "date_publication": meta.get("dc.date.issued", ["Unknown"])[0],
-                "journal": meta.get("dc.publisher", ["WHO"])[0],
-                "mots_cles": keywords,
-                "maladie": disease,
-                "source": "WHO",
-                "lien": link,
-                "type_contenu": "non_classifie",
-                "date_scraping": datetime.now(),
-            }
-
-            if not collection.find_one({"lien": link}) and link:
-                collection.insert_one(doc)
-                saved += 1
-
-        except Exception:
-            continue
-
-    print(f"  {saved} saved")
-    time.sleep(2)
+    print(f"  [OK] Total de nouveaux articles sauvegardés pour {disease} : {saved}")
     return saved
 
 
 if __name__ == "__main__":
-    print("=== WHO Scraper ===")
+    print("=== WHO Scraper (Version Pagination Multi-pages) ===")
     total = 0
     for d in DISEASES:
         total += scrape_who(d)
-    print(f"\nTotal saved: {total}")
-    print(f"Total in MongoDB: {collection.count_documents({})}")
+        time.sleep(2)  # Pause entre les différentes maladies
+        
+    print(f"\n==================================================")
+    print(f"Fin du scraping WHO !")
+    print(f"Nouveaux articles ajoutés lors de cette session : {total}")
+    print(f"Total global dans la collection MongoDB 'articles_who' : {collection.count_documents({})}")
+    print(f"==================================================")
+    
+    print("\nDétails des documents stockés par maladie :")
     for d in DISEASES:
-        print(f"  {d}: {collection.count_documents({'maladie': d})}")
+        print(f"  - {d:22} : {collection.count_documents({'maladie': d})} articles")

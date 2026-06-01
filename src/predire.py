@@ -21,20 +21,30 @@ model      = joblib.load("models/random_forest.joblib")
 vectorizer = joblib.load("models/tfidf.joblib")
 le         = joblib.load("models/label_encoder.joblib")
 
-# Chargement de l'échantillon validé par l'humain pour réintégration directe
-print("[INFO] Chargement de l'échantillon humain depuis data/articles_etiquetes_corriges.csv...")
-if not os.path.exists("data/articles_etiquetes_corriges.csv"):
-    raise FileNotFoundError("Le fichier data/articles_etiquetes_corriges est introuvable. Étape de validation manquante.")
+# --- Gérer l'absence du fichier corrigé ---
+path_corrige = "data/articles_etiquetes_corriges.csv"
+path_defaut  = "data/articles_etiquetes.csv"
 
-human_df = pd.read_csv("data/articles_etiquetes_corriges.csv", encoding="utf-8-sig")
+if os.path.exists(path_corrige):
+    file_human_path = path_corrige
+    print(f"[INFO] Chargement de l'échantillon humain validé : {file_human_path}")
+elif os.path.exists(path_defaut):
+    file_human_path = path_defaut
+    print(f"[WARNING] '{path_corrige}' introuvable. Bascule sur le fichier par défaut : {file_human_path}")
+else:
+    raise FileNotFoundError(
+        f"Aucun fichier d'échantillon trouvé ('{path_corrige}' ou '{path_defaut}'). "
+        "Veuillez exécuter votre script d'étiquetage initial d'abord."
+    )
+
+human_df = pd.read_csv(file_human_path, encoding="utf-8-sig")
 
 # Dictionnaire pour mapper : titre -> label humain validé
-# On applique .strip() pour éviter les écarts d'espaces blancs
 human_labels = dict(zip(
-    human_df["titre"].fillna("").str.strip(), 
+    human_df["titre"].fillna("").str.strip(),
     human_df["type_contenu"]
 ))
-print(f"[INFO] Chargé {len(human_labels)} articles validés manuellement.")
+print(f"[INFO] Chargé {len(human_labels)} articles de référence pour la consolidation.")
 
 # Prédictions sur l'ensemble du dataset par le modèle ML
 print("[INFO] Calcul des prédictions du modèle sur l'ensemble du dataset...")
@@ -42,7 +52,6 @@ X = vectorizer.transform(df["texte"])
 model_preds = le.inverse_transform(model.predict(X))
 
 # Consolidation Human-in-the-loop
-# Si un article a été validé par l'humain, on garde l'étiquette humaine, sinon on prend la prédiction ML
 df["pred_ml"] = model_preds
 
 def consolider_label(row):
@@ -56,7 +65,7 @@ consolidated = df.apply(consolider_label, axis=1)
 df["type_contenu"] = [item[0] for item in consolidated]
 df["source_label"] = [item[1] for item in consolidated]
 
-# Suppression des colonnes de texte technique / temporaire pour le fichier propre final
+# Suppression des colonnes temporaires
 df.drop(columns=["texte", "pred_ml"], inplace=True)
 
 # Affichage des statistiques de consolidation
@@ -69,8 +78,11 @@ print(f"Articles prédits par le modèle ML         : {repartition_source.get('M
 print("-" * 60)
 print("Répartition finale des catégories :")
 print(df["type_contenu"].value_counts().to_string())
-print("============================================================\n")
+print("=" * 60 + "\n")
+
+# --- CORRECTION : s'assurer que le dossier data/ existe ---
+os.makedirs("data", exist_ok=True)
 
 # Sauvegarde du dataset consolidé final
-df.to_csv("data/articles_classifies.csv", index=False, encoding="utf-8-sig")
+df.to_csv("data/articles_classifies.csv", index=False, encoding="utf-8-sig", errors="replace")
 print("[OK] data/articles_classifies.csv créé avec succès avec toutes les données étiquetées !")

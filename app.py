@@ -887,10 +887,12 @@ def ml_test_page(model, vectorizer, le):
     try:
         with open("models/metrics.json", "r") as f:
             metrics = json.load(f)
-        m1, m2, m3 = st.columns(3)
-        for col, val, lbl in zip([m1, m2, m3],
-                                 [f"{metrics['accuracy']}%", f"{metrics['n_articles']:,}", f"{len(metrics['classes'])}"],
-                                 ["Précision", "Articles d'entraînement", "Classes"]):
+        m1, m2 = st.columns(2)
+        for col, val, lbl in zip(
+            [m1, m2],
+            [f"{metrics['n_articles_train']:,}", f"{len(metrics['classes'])}"],
+            ["Articles d'entraînement", "Classes"]
+        ):
             with col:
                 st.markdown(f"""
                     <div class="metric-card">

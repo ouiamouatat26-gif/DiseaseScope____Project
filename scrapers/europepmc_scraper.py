@@ -22,7 +22,7 @@ def scrape_europe_pmc(disease):
     params = {
         "query": disease,
         "resultType": "core",
-        "pageSize": 200,
+        "pageSize": 1000,
         "format": "json",
         "sort": "CITED desc",
     }
