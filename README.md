@@ -189,8 +189,7 @@ python src/verify_predictions.py
 ### 8. Lancer le dashboard web
 
 ```bash
-streamlit run streamlit_app.py
-
+streamlit run app.py
 ```
 
 

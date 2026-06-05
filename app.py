@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import joblib
@@ -875,7 +876,7 @@ def ml_test_page(model, vectorizer, le):
     st.markdown(f"""
         <div style="margin-bottom: 1.75rem;">
             <h1 class="main-header">🧪 Classification ML</h1>
-            <p class="sub-header">Testez le modèle Random Forest sur vos textes médicaux</p>
+            <p class="sub-header">Testez le modèle LinearSVC sur vos textes médicaux</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -932,8 +933,22 @@ def ml_test_page(model, vectorizer, le):
     if classify_btn and input_text.strip():
         X = vectorizer.transform([input_text.lower()])
         pred = model.predict(X)[0]
-        proba = model.predict_proba(X)[0]
         predicted_class = le.inverse_transform([pred])[0]
+
+        if hasattr(model, "predict_proba"):
+            proba = model.predict_proba(X)[0]
+        else:
+            scores = model.decision_function(X)
+
+            if scores.ndim == 1:
+                if len(le.classes_) == 2:
+                    scores = np.array([[-scores[0], scores[0]]])
+                else:
+                    scores = np.array([scores])
+
+            exp_scores = np.exp(scores[0] - np.max(scores[0]))
+            proba = exp_scores / exp_scores.sum()
+
         confidence = float(max(proba))
 
         st.markdown("""
@@ -973,12 +988,12 @@ def ml_test_page(model, vectorizer, le):
         # ── Probability Chart ────────────────────────────────
         st.markdown("""
             <div class="chart-card" style="margin-top: 1.25rem;">
-                <div class="chart-title"><span class="dot"></span> Probabilités par Classe</div>
+                <div class="chart-title"><span class="dot"></span> Scores de confiance par Classe</div>
         """, unsafe_allow_html=True)
 
-        proba_df = pd.DataFrame({"Classe": le.classes_, "Probabilité": proba}).sort_values("Probabilité", ascending=True)
+        proba_df = pd.DataFrame({"Classe": le.classes_, "Score": proba}).sort_values("Probabilité", ascending=True)
         colors = [class_color(c) for c in proba_df["Classe"]]
-        fig_proba = px.bar(proba_df, x="Probabilité", y="Classe", orientation="h", text=proba_df["Probabilité"].apply(lambda v: f"{v:.1%}"))
+        fig_proba = px.bar(proba_df, x="Score", y="Classe", orientation="h", text=proba_df["Score"].apply(lambda v: f"{v:.1%}"))
         fig_proba.update_traces(
             marker_color=colors, textposition="outside",
             textfont=dict(size=11, family="Inter, sans-serif"),

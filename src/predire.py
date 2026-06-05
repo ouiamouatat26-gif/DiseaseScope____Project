@@ -12,12 +12,12 @@ print(f"[INFO] Dataset complet chargé : {len(df)} articles.")
 
 # Chargement du modèle et des outils d'encodage
 print("[INFO] Chargement des modèles entraînés...")
-if not (os.path.exists("models/random_forest.joblib") and 
+if not (os.path.exists("models/linearsvc.joblib") and 
         os.path.exists("models/tfidf.joblib") and 
         os.path.exists("models/label_encoder.joblib")):
     raise FileNotFoundError("Modèles introuvables dans models/. Avez-vous exécuté 'python src/train_model.py' ?")
 
-model      = joblib.load("models/random_forest.joblib")
+model      = joblib.load("models/linearsvc.joblib")
 vectorizer = joblib.load("models/tfidf.joblib")
 le         = joblib.load("models/label_encoder.joblib")
 
