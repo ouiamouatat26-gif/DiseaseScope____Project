@@ -124,8 +124,8 @@ df["texte_complet"] = (df["titre"].fillna("") + " " + df["resume"].fillna("")).s
 print("[INFO] Application de l'étiquetage par mots-clés riches...")
 df["type_contenu"] = df["texte_complet"].apply(appliquer_mots_cles_riches)
 
-# Extraction d'un échantillon d'entraînement élargi (3500 articles) pour nourrir le TF-IDF
-SAMPLE_SIZE = min(3500, len(df))
+# Extraction d'un échantillon d'entraînement élargi (800 articles) pour nourrir le TF-IDF
+SAMPLE_SIZE = min(800, len(df))
 print(f"[INFO] Extraction de l'échantillon d'entraînement (Taille : {SAMPLE_SIZE} articles)...")
 df_sample = df.sample(n=SAMPLE_SIZE, random_state=42)
 
