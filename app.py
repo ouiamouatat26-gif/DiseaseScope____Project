@@ -470,19 +470,19 @@ st.markdown("""
 @st.cache_data(ttl=3600)
 def load_data():
     try:
-        df = pd.read_csv("data/articles_classifies.csv", encoding="utf-8-sig")
+        df = pd.read_csv("data/articles_topics.csv", encoding="utf-8-sig")
         df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         return df
     except FileNotFoundError:
-        st.error("Fichier `data/articles_classifies.csv` non trouvé. Veuillez exécuter le pipeline de classification.")
+        st.error("Fichier `data/articles_topics.csv` non trouvé. Veuillez exécuter le pipeline Stage 1 (python src/topic_modeling.py).")
         return pd.DataFrame()
 
 @st.cache_resource
 def load_model():
     try:
-        model = joblib.load("models/random_forest.joblib")
-        vectorizer = joblib.load("models/tfidf.joblib")
-        le = joblib.load("models/label_encoder.joblib")
+        model = joblib.load("models/topic_classifier.joblib")
+        vectorizer = joblib.load("models/topic_tfidf.joblib")
+        le = joblib.load("models/topic_label_encoder.joblib")
         return model, vectorizer, le
     except FileNotFoundError:
         return None, None, None
@@ -494,13 +494,22 @@ def extract_year(date_str):
     return int(match.group()) if match else None
 
 def class_color(class_name):
-    mapping = {
+    # Génère une couleur basée sur le hash du topic
+    color_map = {
         "treatment": "#10B981",
         "prevention": "#F59E0B",
         "diagnosis": "#0D9488",
         "research": "#8B5CF6",
     }
-    return mapping.get(class_name, "#6B7280")
+    # Cherche les mots-clés du topic pour assigner une couleur
+    class_lower = str(class_name).lower()
+    for keyword, color in color_map.items():
+        if keyword in class_lower:
+            return color
+    # Couleur par défaut basée sur le hash du topic
+    import hashlib
+    hash_color = hashlib.md5(class_name.encode()).hexdigest()[:6]
+    return f"#{hash_color}"
 
 def badge_class(class_name):
     mapping = {
@@ -509,7 +518,13 @@ def badge_class(class_name):
         "diagnosis": "badge-info",
         "research": "badge-research",
     }
-    return mapping.get(class_name, "badge-info")
+    # Cherche les mots-clés du topic
+    class_lower = str(class_name).lower()
+    for keyword, badge in mapping.items():
+        if keyword in class_lower:
+            return badge
+    # Badge par défaut
+    return "badge-info"
 
 # ============================================================
 # SIDEBAR
@@ -569,8 +584,8 @@ def dashboard_page(df):
     metrics = [
         ("📄", len(df), "Total Articles"),
         ("🏛️", df["source"].nunique(), "Sources"),
-        ("🧪", df["maladie"].nunique(), "Pathologies"),
-        ("📑", df["type_contenu"].nunique(), "Types de Contenu"),
+        ("🧪", df["topic_label"].nunique() if "topic_label" in df.columns else df["maladie"].nunique(), "Topics"),
+        ("📑", df["type_contenu"].nunique() if "type_contenu" in df.columns else 0, "Types de Contenu"),
     ]
     for col, (icon, value, label) in zip([col1, col2, col3, col4], metrics):
         with col:
@@ -590,12 +605,12 @@ def dashboard_page(df):
     with c1:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Distribution par Pathologie</div>
+                <div class="chart-title"><span class="dot"></span> Distribution par Topic</div>
         """, unsafe_allow_html=True)
-        disease_counts = df["maladie"].value_counts().reset_index()
-        disease_counts.columns = ["Pathologie", "Nombre"]
+        topic_counts = df["topic_label"].value_counts().reset_index() if "topic_label" in df.columns else df["maladie"].value_counts().reset_index()
+        topic_counts.columns = ["Topic", "Nombre"]
         fig_disease = px.bar(
-            disease_counts, x="Pathologie", y="Nombre",
+            topic_counts, x="Topic", y="Nombre",
             color="Nombre",
             color_continuous_scale=["#0F766E", "#0D9488", "#14B8A6", "#06B6D4"],
             text="Nombre"
@@ -701,51 +716,55 @@ def dashboard_page(df):
     with c1:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Matrice Pathologie × Type</div>
+                <div class="chart-title"><span class="dot"></span> Matrice Topic × Type</div>
         """, unsafe_allow_html=True)
-        heatmap_data = df.groupby(["maladie", "type_contenu"]).size().unstack(fill_value=0)
-        fig_hm = px.imshow(
-            heatmap_data.T,
-            labels=dict(x="Pathologie", y="Type de Contenu", color="Articles"),
-            color_continuous_scale=["#F1F5F9", "#99F6E4", "#0D9488", "#0F766E"],
-            aspect="auto", text_auto=True
-        )
-        fig_hm.update_traces(textfont=dict(size=9))
-        fig_hm.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter, sans-serif", size=10, color="var(--st-text-color)"),
-            xaxis=dict(tickangle=-30, tickfont=dict(size=9), title_font=dict(size=10)),
-            yaxis=dict(tickfont=dict(size=9), title_font=dict(size=10)),
-            coloraxis_colorbar=dict(tickfont=dict(size=9), title_font=dict(size=9)),
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=360
-        )
-        st.plotly_chart(fig_hm, use_container_width=True)
+        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
+        heatmap_data = df.groupby([topic_col, "type_contenu"]).size().unstack(fill_value=0) if "type_contenu" in df.columns else pd.DataFrame()
+        if not heatmap_data.empty:
+            fig_hm = px.imshow(
+                heatmap_data.T,
+                labels=dict(x="Topic", y="Type de Contenu", color="Articles"),
+                color_continuous_scale=["#F1F5F9", "#99F6E4", "#0D9488", "#0F766E"],
+                aspect="auto", text_auto=True
+            )
+            fig_hm.update_traces(textfont=dict(size=9))
+            fig_hm.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=10, color="var(--st-text-color)"),
+                xaxis=dict(tickangle=-30, tickfont=dict(size=9), title_font=dict(size=10)),
+                yaxis=dict(tickfont=dict(size=9), title_font=dict(size=10)),
+                coloraxis_colorbar=dict(tickfont=dict(size=9), title_font=dict(size=9)),
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=360
+            )
+            st.plotly_chart(fig_hm, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Matrice Pathologie × Source</div>
+                <div class="chart-title"><span class="dot"></span> Matrice Topic × Source</div>
         """, unsafe_allow_html=True)
-        source_matrix = df.groupby(["maladie", "source"]).size().unstack(fill_value=0)
-        fig_sm = px.imshow(
-            source_matrix.T,
-            labels=dict(x="Pathologie", y="Source", color="Articles"),
-            color_continuous_scale=["#F1F5F9", "#C4B5FD", "#7C3AED", "#5B21B6"],
-            aspect="auto", text_auto=True
-        )
-        fig_sm.update_traces(textfont=dict(size=9))
-        fig_sm.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter, sans-serif", size=10, color="var(--st-text-color)"),
-            xaxis=dict(tickangle=-30, tickfont=dict(size=9), title_font=dict(size=10)),
-            yaxis=dict(tickfont=dict(size=9), title_font=dict(size=10)),
-            coloraxis_colorbar=dict(tickfont=dict(size=9), title_font=dict(size=9)),
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=360
-        )
-        st.plotly_chart(fig_sm, use_container_width=True)
+        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
+        source_matrix = df.groupby([topic_col, "source"]).size().unstack(fill_value=0) if "source" in df.columns else pd.DataFrame()
+        if not source_matrix.empty:
+            fig_sm = px.imshow(
+                source_matrix.T,
+                labels=dict(x="Topic", y="Source", color="Articles"),
+                color_continuous_scale=["#F1F5F9", "#C4B5FD", "#7C3AED", "#5B21B6"],
+                aspect="auto", text_auto=True
+            )
+            fig_sm.update_traces(textfont=dict(size=9))
+            fig_sm.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=10, color="var(--st-text-color)"),
+                xaxis=dict(tickangle=-30, tickfont=dict(size=9), title_font=dict(size=10)),
+                yaxis=dict(tickfont=dict(size=9), title_font=dict(size=10)),
+                coloraxis_colorbar=dict(tickfont=dict(size=9), title_font=dict(size=9)),
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=360
+            )
+            st.plotly_chart(fig_sm, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ============================================================
@@ -770,11 +789,12 @@ def search_page(df):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        disease_filter = st.selectbox("Pathologie", ["Toutes"] + sorted(df["maladie"].dropna().unique().tolist()))
+        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
+        disease_filter = st.selectbox("Topic", ["Toutes"] + sorted(df[topic_col].dropna().unique().tolist()))
     with c2:
-        content_filter = st.selectbox("Type de Contenu", ["Tous"] + sorted(df["type_contenu"].dropna().unique().tolist()))
+        content_filter = st.selectbox("Type de Contenu", ["Tous"] + sorted(df["type_contenu"].dropna().unique().tolist())) if "type_contenu" in df.columns else "Tous"
     with c3:
-        source_filter = st.selectbox("Source", ["Toutes"] + sorted(df["source"].dropna().unique().tolist()))
+        source_filter = st.selectbox("Source", ["Toutes"] + sorted(df["source"].dropna().unique().tolist())) if "source" in df.columns else "Toutes"
 
     c1, c2 = st.columns([1, 2])
     with c1:
@@ -789,11 +809,12 @@ def search_page(df):
 
     # ── Apply Filters ────────────────────────────────────────
     filtered = df.copy()
+    topic_col = "topic_label" if "topic_label" in filtered.columns else "maladie"
     if disease_filter != "Toutes":
-        filtered = filtered[filtered["maladie"] == disease_filter]
-    if content_filter != "Tous":
+        filtered = filtered[filtered[topic_col] == disease_filter]
+    if content_filter != "Tous" and "type_contenu" in filtered.columns:
         filtered = filtered[filtered["type_contenu"] == content_filter]
-    if source_filter != "Toutes":
+    if source_filter != "Toutes" and "source" in filtered.columns:
         filtered = filtered[filtered["source"] == source_filter]
     year_mask = filtered["year"].isna() | (
         (filtered["year"] >= year_range[0]) & (filtered["year"] <= year_range[1])
@@ -828,15 +849,16 @@ def search_page(df):
 
     # ── Article List ─────────────────────────────────────────
     for _, row in page_df.iterrows():
-        badge = badge_class(row.get("type_contenu", ""))
+        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
+        badge = badge_class(row.get(topic_col, ""))
         title = str(row.get("titre", "Sans titre"))
         st.markdown(f"""
             <div class="article-card">
                 <div class="article-title">{title}</div>
                 <div class="article-meta">
-                    <span>🧬 {row.get('maladie', 'N/A')}</span>
-                    <span>🏛️ {row.get('source', 'N/A')}</span>
-                    <span class="badge {badge}">{row.get('type_contenu', 'N/A')}</span>
+                    <span>🧪 {row.get(topic_col, 'N/A')}</span>
+                    <span>🏛️ {row.get('source', 'N/A') if 'source' in df.columns else 'N/A'}</span>
+                    <span class="badge {badge}">{row.get('type_contenu', 'N/A') if 'type_contenu' in df.columns else 'N/A'}</span>
                     <span>📅 {row.get('date_publication', 'N/A')}</span>
                 </div>
             </div>
@@ -875,24 +897,24 @@ def search_page(df):
 def ml_test_page(model, vectorizer, le):
     st.markdown(f"""
         <div style="margin-bottom: 1.75rem;">
-            <h1 class="main-header">🧪 Classification ML</h1>
-            <p class="sub-header">Testez le modèle LinearSVC sur vos textes médicaux</p>
+            <h1 class="main-header">🧪 Classification Topics</h1>
+            <p class="sub-header">Testez le classifieur supervisé (LinearSVC) sur vos textes médicaux</p>
         </div>
     """, unsafe_allow_html=True)
 
     if model is None:
-        st.error("Modèle ML non trouvé. Entraînez d'abord avec `python src/train_model.py`")
+        st.error("Modèle ML non trouvé. Exécutez d'abord le pipeline complet : python src/topic_modeling.py puis python src/train_model.py")
         return
 
     # ── Model Info ───────────────────────────────────────────
     try:
-        with open("models/metrics.json", "r") as f:
+        with open("models/topic_metrics.json", "r") as f:
             metrics = json.load(f)
         m1, m2 = st.columns(2)
         for col, val, lbl in zip(
             [m1, m2],
-            [f"{metrics['n_articles_train']:,}", f"{len(metrics['classes'])}"],
-            ["Articles d'entraînement", "Classes"]
+            [f"{metrics.get('n_articles', 'N/A'):,}", f"{metrics.get('n_classes', len(metrics.get('classes', [])))}"],
+            ["Articles du corpus", "Topics découverts"]
         ):
             with col:
                 st.markdown(f"""
@@ -906,7 +928,7 @@ def ml_test_page(model, vectorizer, le):
         class_badge = " ".join([f'<span class="badge {badge_class(c)}">{c}</span>' for c in metrics.get("classes", le.classes_)])
         st.markdown(f"""
             <div style="margin-bottom: 1.25rem;">
-                <span style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.08em;">Classes du modèle</span>
+                <span style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.08em;">Topics détectés</span>
                 <div style="margin-top: 0.4rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">{class_badge}</div>
             </div>
         """, unsafe_allow_html=True)
@@ -991,7 +1013,7 @@ def ml_test_page(model, vectorizer, le):
                 <div class="chart-title"><span class="dot"></span> Scores de confiance par Classe</div>
         """, unsafe_allow_html=True)
 
-        proba_df = pd.DataFrame({"Classe": le.classes_, "Score": proba}).sort_values("Probabilité", ascending=True)
+        proba_df = pd.DataFrame({"Classe": le.classes_, "Score": proba}).sort_values("Score", ascending=True)
         colors = [class_color(c) for c in proba_df["Classe"]]
         fig_proba = px.bar(proba_df, x="Score", y="Classe", orientation="h", text=proba_df["Score"].apply(lambda v: f"{v:.1%}"))
         fig_proba.update_traces(
