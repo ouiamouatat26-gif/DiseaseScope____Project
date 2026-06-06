@@ -493,38 +493,97 @@ def extract_year(date_str):
     match = re.search(r"(19|20)\d{2}", str(date_str))
     return int(match.group()) if match else None
 
+# Colonne principale pour les topics (macro-catégories propres)
+def get_topic_col(df):
+    """Retourne la meilleure colonne de topic disponible."""
+    if "macro_topic" in df.columns:
+        return "macro_topic"
+    if "topic_label" in df.columns:
+        return "topic_label"
+    return "maladie"
+
+def clean_topic_label(raw_label):
+    if not raw_label or pd.isna(raw_label):
+        return "N/A"
+    raw_label = str(raw_label)
+    parts = raw_label.split('_')
+    if len(parts) > 1 and parts[0].replace('-', '').isdigit():
+        words = parts[1:]
+    else:
+        words = parts
+    return ", ".join(words).replace("_", " ").title()
+
+def get_macro_for_raw_label(raw_label):
+    if not raw_label or pd.isna(raw_label):
+        return "Autres Spécialités"
+    raw_label = str(raw_label)
+    parts = raw_label.split('_')
+    if len(parts) > 1 and parts[0].replace('-', '').isdigit():
+        try:
+            topic_id = int(parts[0])
+            from src.post_process_topics import TOPIC_TO_MACRO
+            return TOPIC_TO_MACRO.get(topic_id, "Autres Spécialités")
+        except Exception:
+            pass
+    return "Autres Spécialités"
+
+
+# Palette de couleurs pour les macro-catégories
+MACRO_COLORS = {
+    "Oncologie": "#E11D48",
+    "Alzheimer & Démence": "#7C3AED",
+    "Biologie Moléculaire": "#059669",
+    "Cardiologie": "#DC2626",
+    "Diabète & Métabolisme": "#D97706",
+    "COVID-19 & Pandémies": "#0891B2",
+    "Ophtalmologie": "#2563EB",
+    "Autres Spécialités": "#6B7280",
+    "Neurologie": "#9333EA",
+    "Maladies Auto-immunes": "#EA580C",
+    "Maladies Infectieuses": "#65A30D",
+    "Santé Publique": "#0D9488",
+    "Pharmacologie": "#4F46E5",
+    "Maladies Respiratoires": "#0284C7",
+    "Imagerie & IA Médicale": "#7C3AED",
+    "Gastro-entérologie": "#CA8A04",
+}
+
+TYPE_COLORS = {
+    "Essai clinique": "#10B981",
+    "Étude observationnelle": "#0D9488",
+    "Méta-analyse": "#8B5CF6",
+    "Revue systématique": "#06B6D4",
+    "Recherche fondamentale": "#F59E0B",
+    "Étude de cas": "#EC4899",
+    "Information santé": "#3B82F6",
+    "Recommandation clinique": "#14B8A6",
+    "Étude génomique": "#6366F1",
+    "Autre": "#6B7280",
+}
+
 def class_color(class_name):
-    # Génère une couleur basée sur le hash du topic
-    color_map = {
-        "treatment": "#10B981",
-        "prevention": "#F59E0B",
-        "diagnosis": "#0D9488",
-        "research": "#8B5CF6",
-    }
-    # Cherche les mots-clés du topic pour assigner une couleur
-    class_lower = str(class_name).lower()
-    for keyword, color in color_map.items():
-        if keyword in class_lower:
-            return color
-    # Couleur par défaut basée sur le hash du topic
+    cn = str(class_name)
+    if cn in MACRO_COLORS:
+        return MACRO_COLORS[cn]
+    if cn in TYPE_COLORS:
+        return TYPE_COLORS[cn]
     import hashlib
-    hash_color = hashlib.md5(class_name.encode()).hexdigest()[:6]
+    hash_color = hashlib.md5(cn.encode()).hexdigest()[:6]
     return f"#{hash_color}"
 
 def badge_class(class_name):
     mapping = {
-        "treatment": "badge-success",
-        "prevention": "badge-warning",
-        "diagnosis": "badge-info",
-        "research": "badge-research",
+        "Essai clinique": "badge-success",
+        "Méta-analyse": "badge-research",
+        "Revue systématique": "badge-info",
+        "Étude observationnelle": "badge-info",
+        "Recherche fondamentale": "badge-warning",
+        "Étude de cas": "badge-warning",
+        "Information santé": "badge-info",
+        "Recommandation clinique": "badge-success",
+        "Étude génomique": "badge-research",
     }
-    # Cherche les mots-clés du topic
-    class_lower = str(class_name).lower()
-    for keyword, badge in mapping.items():
-        if keyword in class_lower:
-            return badge
-    # Badge par défaut
-    return "badge-info"
+    return mapping.get(str(class_name), "badge-info")
 
 # ============================================================
 # SIDEBAR
@@ -584,7 +643,7 @@ def dashboard_page(df):
     metrics = [
         ("📄", len(df), "Total Articles"),
         ("🏛️", df["source"].nunique(), "Sources"),
-        ("🧪", df["topic_label"].nunique() if "topic_label" in df.columns else df["maladie"].nunique(), "Topics"),
+        ("🧪", df[get_topic_col(df)].nunique(), "Catégories"),
         ("📑", df["type_contenu"].nunique() if "type_contenu" in df.columns else 0, "Types de Contenu"),
     ]
     for col, (icon, value, label) in zip([col1, col2, col3, col4], metrics):
@@ -605,25 +664,26 @@ def dashboard_page(df):
     with c1:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Distribution par Topic</div>
+                <div class="chart-title"><span class="dot"></span> Distribution par Catégorie</div>
         """, unsafe_allow_html=True)
-        topic_counts = df["topic_label"].value_counts().reset_index() if "topic_label" in df.columns else df["maladie"].value_counts().reset_index()
-        topic_counts.columns = ["Topic", "Nombre"]
+        tc = get_topic_col(df)
+        topic_counts = df[tc].value_counts().reset_index()
+        topic_counts.columns = ["Catégorie", "Nombre"]
         fig_disease = px.bar(
-            topic_counts, x="Topic", y="Nombre",
-            color="Nombre",
-            color_continuous_scale=["#0F766E", "#0D9488", "#14B8A6", "#06B6D4"],
+            topic_counts, x="Catégorie", y="Nombre",
+            color="Catégorie",
+            color_discrete_map={cat: class_color(cat) for cat in topic_counts["Catégorie"]},
             text="Nombre"
         )
         fig_disease.update_traces(textposition="outside", textfont_size=11)
         fig_disease.update_layout(
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             font=dict(family="Inter, sans-serif", color="var(--st-text-color)"),
-            xaxis=dict(showgrid=False, tickangle=-35, tickfont=dict(size=10), title_font=dict(size=11)),
+            xaxis=dict(showgrid=False, tickangle=-40, tickfont=dict(size=9), title_font=dict(size=11)),
             yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.08)", tickfont=dict(size=10), title_font=dict(size=11)),
-            margin=dict(l=10, r=10, t=10, b=10),
-            coloraxis_showscale=False,
-            height=320
+            margin=dict(l=10, r=10, t=10, b=80),
+            showlegend=False,
+            height=380
         )
         st.plotly_chart(fig_disease, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -716,14 +776,14 @@ def dashboard_page(df):
     with c1:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Matrice Topic × Type</div>
+                <div class="chart-title"><span class="dot"></span> Matrice Catégorie × Type</div>
         """, unsafe_allow_html=True)
-        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
-        heatmap_data = df.groupby([topic_col, "type_contenu"]).size().unstack(fill_value=0) if "type_contenu" in df.columns else pd.DataFrame()
+        tc = get_topic_col(df)
+        heatmap_data = df.groupby([tc, "type_contenu"]).size().unstack(fill_value=0) if "type_contenu" in df.columns else pd.DataFrame()
         if not heatmap_data.empty:
             fig_hm = px.imshow(
                 heatmap_data.T,
-                labels=dict(x="Topic", y="Type de Contenu", color="Articles"),
+                labels=dict(x="Catégorie", y="Type de Contenu", color="Articles"),
                 color_continuous_scale=["#F1F5F9", "#99F6E4", "#0D9488", "#0F766E"],
                 aspect="auto", text_auto=True
             )
@@ -743,14 +803,14 @@ def dashboard_page(df):
     with c2:
         st.markdown("""
             <div class="chart-card">
-                <div class="chart-title"><span class="dot"></span> Matrice Topic × Source</div>
+                <div class="chart-title"><span class="dot"></span> Matrice Catégorie × Source</div>
         """, unsafe_allow_html=True)
-        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
-        source_matrix = df.groupby([topic_col, "source"]).size().unstack(fill_value=0) if "source" in df.columns else pd.DataFrame()
+        tc = get_topic_col(df)
+        source_matrix = df.groupby([tc, "source"]).size().unstack(fill_value=0) if "source" in df.columns else pd.DataFrame()
         if not source_matrix.empty:
             fig_sm = px.imshow(
                 source_matrix.T,
-                labels=dict(x="Topic", y="Source", color="Articles"),
+                labels=dict(x="Catégorie", y="Source", color="Articles"),
                 color_continuous_scale=["#F1F5F9", "#C4B5FD", "#7C3AED", "#5B21B6"],
                 aspect="auto", text_auto=True
             )
@@ -789,8 +849,8 @@ def search_page(df):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
-        disease_filter = st.selectbox("Topic", ["Toutes"] + sorted(df[topic_col].dropna().unique().tolist()))
+        topic_col = get_topic_col(df)
+        disease_filter = st.selectbox("Catégorie", ["Toutes"] + sorted(df[topic_col].dropna().unique().tolist()))
     with c2:
         content_filter = st.selectbox("Type de Contenu", ["Tous"] + sorted(df["type_contenu"].dropna().unique().tolist())) if "type_contenu" in df.columns else "Tous"
     with c3:
@@ -809,7 +869,7 @@ def search_page(df):
 
     # ── Apply Filters ────────────────────────────────────────
     filtered = df.copy()
-    topic_col = "topic_label" if "topic_label" in filtered.columns else "maladie"
+    topic_col = get_topic_col(filtered)
     if disease_filter != "Toutes":
         filtered = filtered[filtered[topic_col] == disease_filter]
     if content_filter != "Tous" and "type_contenu" in filtered.columns:
@@ -849,16 +909,19 @@ def search_page(df):
 
     # ── Article List ─────────────────────────────────────────
     for _, row in page_df.iterrows():
-        topic_col = "topic_label" if "topic_label" in df.columns else "maladie"
-        badge = badge_class(row.get(topic_col, ""))
+        topic_col = get_topic_col(df)
+        macro = row.get(topic_col, 'N/A')
+        type_c = row.get('type_contenu', 'N/A') if 'type_contenu' in df.columns else 'N/A'
+        badge_tc = badge_class(type_c)
+        macro_color = class_color(macro)
         title = str(row.get("titre", "Sans titre"))
         st.markdown(f"""
             <div class="article-card">
                 <div class="article-title">{title}</div>
                 <div class="article-meta">
-                    <span>🧪 {row.get(topic_col, 'N/A')}</span>
+                    <span style="border-color: {macro_color}40; color: {macro_color};">🏷️ {macro}</span>
+                    <span class="badge {badge_tc}">📋 {type_c}</span>
                     <span>🏛️ {row.get('source', 'N/A') if 'source' in df.columns else 'N/A'}</span>
-                    <span class="badge {badge}">{row.get('type_contenu', 'N/A') if 'type_contenu' in df.columns else 'N/A'}</span>
                     <span>📅 {row.get('date_publication', 'N/A')}</span>
                 </div>
             </div>
@@ -925,11 +988,17 @@ def ml_test_page(model, vectorizer, le):
                 """, unsafe_allow_html=True)
 
         st.markdown("<div style='margin: 0.75rem 0;'></div>", unsafe_allow_html=True)
-        class_badge = " ".join([f'<span class="badge {badge_class(c)}">{c}</span>' for c in metrics.get("classes", le.classes_)])
+        raw_classes = metrics.get("classes", list(le.classes_))
+        macro_classes = sorted(list(set(get_macro_for_raw_label(c) for c in raw_classes)))
+        class_badges = []
+        for c in macro_classes:
+            color = class_color(c)
+            class_badges.append(f'<span class="badge" style="background-color: {color}18; color: {color}; border-color: {color}30; border: 1px solid; margin-bottom: 0.4rem;">{c}</span>')
+        class_badge_html = " ".join(class_badges)
         st.markdown(f"""
             <div style="margin-bottom: 1.25rem;">
-                <span style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.08em;">Topics détectés</span>
-                <div style="margin-top: 0.4rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">{class_badge}</div>
+                <span style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.08em;">Macro-catégories supportées</span>
+                <div style="margin-top: 0.4rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">{class_badge_html}</div>
             </div>
         """, unsafe_allow_html=True)
     except FileNotFoundError:
@@ -983,13 +1052,18 @@ def ml_test_page(model, vectorizer, le):
 
         c1, c2 = st.columns([1, 1])
         with c1:
-            pred_color = class_color(predicted_class)
+            macro_pred = get_macro_for_raw_label(predicted_class)
+            pred_color = class_color(macro_pred)
+            cleaned_sub = clean_topic_label(predicted_class)
             st.markdown(f"""
                 <div style="margin-bottom: 0.75rem;">
-                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem;">Classe Prédite</div>
-                    <span class="prediction-badge" style="background: linear-gradient(135deg, {pred_color} 0%, {pred_color}dd 100%);">
-                        {predicted_class.upper()}
+                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--st-text-color); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem;">Catégorie Prédite</div>
+                    <span class="prediction-badge" style="background: linear-gradient(135deg, {pred_color} 0%, {pred_color}dd 100%); box-shadow: 0 4px 12px {pred_color}40;">
+                        {macro_pred.upper()}
                     </span>
+                    <div style="font-size: 0.75rem; color: var(--st-text-color); opacity: 0.7; margin-top: 0.6rem;">
+                        <strong>Sujet spécifique :</strong> <span style="color: {pred_color}; font-weight: 600;">{cleaned_sub}</span>
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -1010,22 +1084,38 @@ def ml_test_page(model, vectorizer, le):
         # ── Probability Chart ────────────────────────────────
         st.markdown("""
             <div class="chart-card" style="margin-top: 1.25rem;">
-                <div class="chart-title"><span class="dot"></span> Scores de confiance par Classe</div>
+                <div class="chart-title"><span class="dot"></span> Top 5 des prédictions les plus probables</div>
         """, unsafe_allow_html=True)
 
-        proba_df = pd.DataFrame({"Classe": le.classes_, "Score": proba}).sort_values("Score", ascending=True)
-        colors = [class_color(c) for c in proba_df["Classe"]]
-        fig_proba = px.bar(proba_df, x="Score", y="Classe", orientation="h", text=proba_df["Score"].apply(lambda v: f"{v:.1%}"))
+        proba_df = pd.DataFrame({
+            "Raw_Classe": le.classes_,
+            "Score": proba
+        })
+        proba_df["Macro"] = proba_df["Raw_Classe"].apply(get_macro_for_raw_label)
+        proba_df["Sujet"] = proba_df["Raw_Classe"].apply(clean_topic_label)
+        proba_df["Classe"] = proba_df["Macro"] + " (" + proba_df["Sujet"] + ")"
+        
+        # Sort and take top 5
+        proba_df = proba_df.sort_values("Score", ascending=True).tail(5)
+        
+        colors = [class_color(c) for c in proba_df["Macro"]]
+        fig_proba = px.bar(
+            proba_df, x="Score", y="Classe", orientation="h",
+            text=proba_df["Score"].apply(lambda v: f"{v:.1%}"),
+            color="Macro",
+            color_discrete_map={m: class_color(m) for m in proba_df["Macro"]}
+        )
         fig_proba.update_traces(
-            marker_color=colors, textposition="outside",
-            textfont=dict(size=11, family="Inter, sans-serif"),
+            textposition="outside",
+            textfont=dict(size=10, family="Inter, sans-serif"),
         )
         fig_proba.update_layout(
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter, sans-serif", size=11, color="var(--st-text-color)"),
-            xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.08)", tickformat=".0%", range=[0, 1]),
+            font=dict(family="Inter, sans-serif", size=10, color="var(--st-text-color)"),
+            xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.08)", tickformat=".0%", range=[0, 1.1]),
             yaxis=dict(showgrid=False),
             margin=dict(l=10, r=10, t=10, b=10),
+            showlegend=False,
             height=260,
             bargap=0.3
         )

@@ -31,6 +31,7 @@ import pandas as pd
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
@@ -92,8 +93,9 @@ def main():
     )
 
     # --- Entraînement --------------------------------------------------------
-    print("[INFO] Entraînement du classifieur supervisé (LinearSVC) ...")
-    model = LinearSVC(C=0.5, class_weight="balanced", random_state=42, max_iter=3000)
+    print("[INFO] Entraînement du classifieur supervisé (Calibrated LinearSVC) ...")
+    base_model = LinearSVC(C=0.5, class_weight="balanced", random_state=42, max_iter=3000)
+    model = CalibratedClassifierCV(base_model, cv=3)
     model.fit(X_train, y_train)
 
     # --- Évaluation ----------------------------------------------------------
@@ -111,7 +113,8 @@ def main():
 
     # --- Réentraînement final sur tout le dataset ----------------------------
     print("[INFO] Réentraînement final sur l'ensemble du dataset ...")
-    final_model = LinearSVC(C=0.5, class_weight="balanced", random_state=42, max_iter=3000)
+    final_base_model = LinearSVC(C=0.5, class_weight="balanced", random_state=42, max_iter=3000)
+    final_model = CalibratedClassifierCV(final_base_model, cv=3)
     final_model.fit(X_vec, y_enc)
 
     # --- Sauvegardes ---------------------------------------------------------

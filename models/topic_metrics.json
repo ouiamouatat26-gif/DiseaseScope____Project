@@ -1,5 +1,5 @@
 {
-  "accuracy": 76.8,
+  "accuracy": 77.94,
   "n_classes": 90,
   "classes": [
     "0_alzheimer_ad_cognitive_amyloid",
