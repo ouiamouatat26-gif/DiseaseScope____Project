@@ -1,227 +1,165 @@
-# DiseaseScope 🏥
+# DiseaseScope 🧬 — Medical Research Intelligence
 
-**Système de Veille Intelligente sur les Maladies Chroniques via la Presse Médicale Mondiale**
-
----
-
-## Description du projet
-
-DiseaseScope est un agrégateur intelligent d'articles médicaux qui :
-
-- **Collecte** des articles depuis 5 sources médicales majeures (PubMed, Europe PMC, ClinicalTrials, WHO, MedlinePlus)
-- **Stocke** les données dans MongoDB avec fusion et dédoublonnage automatiques
-- **Nettoie** et normalise les données (textes, URLs, noms de sources, dates)
-- **Classifie** automatiquement le type de contenu de chaque article grâce à un modèle de Machine Learning (Random Forest + TF-IDF)
-- **Visualise** les tendances et statistiques dans un dashboard web interactif avec graphiques et filtres avancés
-
-> **5 704 articles** collectés et classifiés couvrant **10 catégories de maladies** depuis **5 sources** différentes.
+**Plateforme de veille intelligente, de topic modeling et de classification automatique de la littérature médicale mondiale.**
 
 ---
 
-## Technologies utilisées
+## 📋 Description du Projet
 
-| Catégorie | Technologies |
+**DiseaseScope** est un outil avancé d'agrégation, d'analyse et de classification automatique de publications scientifiques médicales. La plateforme permet de collecter, normaliser, classifier et visualiser les tendances de la recherche médicale mondiale à partir de sources majeures de données de santé.
+
+### Chiffres Clés du Corpus Actuel
+* **30 578 articles** indexés et analysés.
+* **5 sources de données majeures** : PubMed, Europe PMC, ClinicalTrials.gov, WHO (OMS), et MedlinePlus.
+* **16 macro-catégories médicales** (Oncologie, Cardiologie, Alzheimer & Démence, Maladies Infectieuses, etc.) issues du post-processing de 91 thématiques découvertes par BERTopic.
+* **10 types de publication scientifiquement classifiés** (Essai clinique, Méta-analyse, Recherche fondamentale, etc.), résolvant entièrement le problème des données non catégorisées.
+
+---
+
+## 🛠️ Technologies Utilisées
+
+| Domaine | Technologies |
 | :--- | :--- |
-| **Langage** | Python 3 |
-| **Scraping** | BeautifulSoup, Requests |
-| **Base de données** | MongoDB (via PyMongo) |
-| **Traitement des données** | Pandas, SciPy |
-| **Machine Learning** | Scikit-learn (TF-IDF, Random Forest, LinearSVC, Logistic Regression, Naive Bayes) |
-| **Interface Web** | Flask, HTML/CSS/JavaScript, Chart.js |
-| **Gestion de données** | DVC (Data Version Control) |
-| **Sérialisation des modèles** | Joblib |
+| **Langage & Cœur** | Python 3.10+ |
+| **Collecte de données** | BeautifulSoup, Requests, APIs PubMed (E-utilities) & Europe PMC |
+| **Stockage & DVC** | MongoDB (via PyMongo), CSV Local, DVC (Data Version Control) |
+| **Traitement & Analyse** | Pandas, NumPy, Scikit-learn, Joblib |
+| **Machine Learning & NLP** | BERTopic, TF-IDF, Calibrated LinearSVC (Support Vector Machine avec étalonnage de Platt) |
+| **Visualisation & Web** | Streamlit, Plotly Express, CSS3 (Glassmorphic design) |
 
 ---
 
-## Architecture du projet
+## 🗂️ Architecture du Projet
 
 ```
-DiseaseScope____Project-main/
+DiseaseScope____Project/
 │
-├── scrapers/                      # Scripts de collecte de données
-│   ├── pubmed_scraper.py          # Scraper PubMed (API E-utilities)
-│   ├── europepmc_scraper.py       # Scraper Europe PMC
-│   ├── who_scraper.py             # Scraper WHO (OMS)
-│   ├── clinicaltrials_scraper.py  # Scraper ClinicalTrials.gov
-│   ├── medlineplus_scraper.py     # Scraper MedlinePlus
-│   ├── fusionner.py               # Fusion, dédoublonnage et export MongoDB
-│   └── validation_quality.py      # Validation qualité post-fusion
+├── scrapers/                         # Collecte et fusion des données
+│   ├── pubmed_scraper.py             # API PubMed (E-utilities)
+│   ├── europepmc_scraper.py          # API Europe PMC
+│   ├── who_scraper.py                # Portail WHO (OMS)
+│   ├── clinicaltrials_scraper.py     # API ClinicalTrials.gov
+│   ├── medlineplus_scraper.py        # MedlinePlus (Encyclopédie médicale)
+│   ├── fusionner.py                  # Dédoublonnage et export MongoDB/CSV
+│   └── validation_quality.py         # Contrôle qualité post-fusion
 │
-├── data/                          # Jeux de données
-│   ├── raw_articles_final.csv     # Articles bruts fusionnés (5 704 articles)
-│   ├── clean_articles.csv         # Articles nettoyés et classifiés
-│   ├── articles_etiquetes.csv     # Articles étiquetés (méthode par mots-clés)
-│   └── test_qualite.py            # Script de contrôle qualité des données
+├── data/                             # Stockage des jeux de données
+│   └── articles_topics.csv           # Le dataset final classifié (30k+ articles)
 │
-├── src/                           # Scripts de traitement et ML
-│   ├── clean_data.py              # Nettoyage et normalisation des données
-│   ├── etiqueter.py               # Étiquetage initial par mots-clés
-│   ├── vectorization.py           # Vectorisation TF-IDF
-│   ├── exporter_tfidf.py          # Export de la matrice TF-IDF
-│   ├── classification.py          # Classification SVM linéaire
-│   ├── train_model.py             # Entraînement Random Forest (type de contenu)
-│   ├── train_disease_classifier.py    # Comparaison de modèles (prédiction maladie)
-│   ├── train_content_type_classifier.py # Comparaison de modèles (type de contenu)
-│   ├── predire.py                 # Prédiction sur l'ensemble du dataset
-│   ├── test_inference.py          # Tests d'inférence en direct
-│   └── verify_predictions.py      # Validation finale des prédictions ML
+├── models/                           # Modèles et métriques sauvegardés
+│   ├── topic_classifier.joblib       # Classifieur SVM étalonné (LinearSVC)
+│   ├── topic_tfidf.joblib            # Vectoriseur TF-IDF associé
+│   ├── topic_label_encoder.joblib    # Encodeur de labels de classes
+│   └── topic_metrics.json            # Rapport de performances et accuracy
 │
-├── models/                        # Modèles entraînés sauvegardés
-│   ├── random_forest.joblib       # Modèle Random Forest (type de contenu)
-│   ├── tfidf.joblib               # Vectoriseur TF-IDF associé
-│   ├── label_encoder.joblib       # Encodeur de labels
-│   ├── best_disease_model.joblib  # Meilleur modèle (prédiction maladie)
-│   ├── best_disease_vectorizer.joblib
-│   ├── best_content_type_model.joblib # Meilleur modèle (type de contenu)
-│   ├── best_content_type_vectorizer.joblib
-│   └── metrics.json               # Métriques du modèle (accuracy, classes)
+├── src/                              # Code source du pipeline ML & Traitement
+│   ├── clean_data.py                 # Nettoyage et normalisation initiale
+│   ├── topic_modeling.py             # Stage 1 — Apprentissage non supervisé (BERTopic)
+│   ├── post_process_topics.py        # Mappage des 91 topics → 16 macro-catégories
+│   ├── classify_content_type.py      # Classification des types de publication par règles regex
+│   └── train_model.py                # Stage 2 — Entraînement du classifieur supervisé étalonné
 │
-├── templates/                     # Templates HTML (Flask)
-│   └── index.html                 # Dashboard principal
+├── visualizations/                   # Rapports de visualisation interactifs HTML
+│   ├── bertopic_topics.html          # Carte interactive des clusters BERTopic
+│   └── bertopic_keywords.html        # Mots-clés discriminants par cluster
 │
-├── visualizations/                # Graphiques statiques exportés
-│   ├── 1_articles_by_disease.png
-│   ├── 2_articles_by_source.png
-│   ├── 3_publication_timeline.png
-│   ├── 4_top_keywords.png
-│   ├── 5_disease_source_coverage.png
-│   └── 6_content_types.png
-│
-├── app.py                         # Serveur Flask (API + Dashboard)
-├── requirements.txt               # Dépendances Python
-└── README.md
+├── app.py                            # Application Web Streamlit (Dashboard + Recherche + ML)
+├── requirements.txt                  # Liste des dépendances Python
+└── README.md                         # Documentation de référence
 ```
 
 ---
 
-## Pipeline de données
+## ⚙️ Pipeline de Données & ML
 
+Le projet est articulé autour d'un pipeline en 4 grandes étapes :
+
+```mermaid
+graph TD
+    A[Scrapers / APIs] -->|Collecte & Dédoublonnage| B[Fusion - CSV Brut]
+    B -->|Nettoyage Sémantique| C[clean_data.py]
+    C -->|Topic Modeling Non-Supervisé| D[topic_modeling.py - BERTopic]
+    D -->|Mapping Sémantique en Français| E[post_process_topics.py - 16 Catégories]
+    E -->|Règles de Publication & Sources| F[classify_content_type.py - 10 Types]
+    F -->|Sauvegarde du Dataset Final| G[(data/articles_topics.csv)]
+    G -->|Entraînement & Étalonnage| H[train_model.py - SVM Calibré]
+    H -->|Modèle Sauvegardé| I[models/topic_classifier.joblib]
+    I -->|Inférence en Temps Réel| J[app.py - Streamlit]
 ```
-[Scrapers]  →  [MongoDB]  →  [Fusion & Dédoublonnage]  →  [CSV brut]
-                                                              ↓
-                                                     [Nettoyage & Normalisation]
-                                                              ↓
-                                                     [Vectorisation TF-IDF]
-                                                              ↓
-                                                     [Entraînement ML]
-                                                              ↓
-                                                     [Classification automatique]
-                                                              ↓
-                                                     [Dashboard Streamlit]
-```
+
+### 1. Extraction et Fusion des Données
+Les scripts du dossier `scrapers/` récupèrent les métadonnées des articles (titre, résumé, source, date, lien). `fusionner.py` unifie les schémas, élimine les doublons par titre et stocke le résultat dans MongoDB et dans un CSV local de secours.
+
+### 2. Post-processing des Topics (91 → 16 Catégories)
+L'exécution de BERTopic génère 91 clusters thématiques bruts (ex: `0_alzheimer_ad_cognitive_amyloid`). Le script `post_process_topics.py` mappe ces thématiques vers **16 macro-catégories médicales claires en français** pour alléger les graphiques et améliorer l'expérience utilisateur.
+
+### 3. Classification du Type de Contenu (type_contenu)
+Le script `classify_content_type.py` analyse de manière déterministe le titre et le résumé de chaque article en utilisant des règles regex ciblées (priorisant les Méta-analyses, Essais cliniques, Études de cas, Recherche fondamentale, etc.) complétées par des valeurs par défaut selon les sources (ex: *ClinicalTrials* $\rightarrow$ *Essai clinique*). Les articles non classifiés sont minimisés au profit de catégories valides.
+
+### 4. Classification Supervisée Étalonnée (Stage 2)
+Le script `train_model.py` entraîne un classifieur de type **LinearSVC** (SVM linéaire) précédé d'une vectorisation **TF-IDF** (25 000 features, unigrammes et bigrammes). 
+Pour garantir l'affichage de pourcentages de confiance réalistes dans l'interface, le modèle est calibré à l'aide de **`CalibratedClassifierCV`** (étalonnage sigmoïde de Platt).
+* **Accuracy de classification** : **77,8%** sur les 90 classes cibles.
 
 ---
 
-## Classification par Machine Learning
+## 📊 Fonctionnalités du Dashboard Streamlit (`app.py`)
 
-### Scénario 1 — Prédiction de la maladie
-Le modèle prédit la catégorie de maladie associée à chaque article à partir du titre et du résumé. Quatre algorithmes sont comparés (Naive Bayes, Logistic Regression, LinearSVC, Random Forest) et le meilleur est automatiquement sélectionné.
+L'interface utilisateur propose 3 onglets principaux :
 
-### Scénario 2 — Prédiction du type de contenu
-Le modèle classe chaque article dans l'une des 4 catégories suivantes :
-
-| Type de contenu | Description | % du dataset |
-| :--- | :--- | :---: |
-| **Treatment** | Traitements, essais cliniques, médicaments | 41,8 % |
-| **Research** | Recherche fondamentale, analyses épidémiologiques | 31,4 % |
-| **Diagnosis** | Diagnostic, imagerie, biomarqueurs, détection | 16,4 % |
-| **Prevention** | Prévention, vaccination, facteurs de risque | 10,4 % |
-
-**Performance du modèle :** Accuracy de **83,87 %** (Random Forest, TF-IDF avec 5 000 features, n-grams (1,2)).
+1. **📊 Dashboard Analytics** : 
+   * Indicateurs clés (KPIs) dynamiques.
+   * Graphiques interactifs (Plotly) : distribution par catégorie médicale, répartition par source d'information, évolution temporelle des publications.
+   * Matrices de corrélation (`Catégorie × Type` et `Catégorie × Source`) pour repérer instantanément les axes de recherche dominants.
+2. **🔍 Recherche Scientifique** :
+   * Moteur de recherche plein texte sur les titres et résumés.
+   * Filtres à facettes (Catégorie, Type de contenu, Source, Plage d'années via un curseur).
+   * Pagination optimisée pour un affichage rapide sous forme de cartes d'articles avec codes couleur premium.
+3. **🧪 Test Modèle ML (Inférence en direct)** :
+   * Saisie libre d'un texte médical (titre + abstract).
+   * Prédiction instantanée de la macro-catégorie médicale associée avec affichage de la confiance calibrée en pourcentage.
+   * Visualisation du **Top 5 des prédictions les plus probables** sous forme de graphique horizontal coloré.
 
 ---
 
-## Installation et lancement
+## 🚀 Installation et Lancement
 
-### 1. Cloner le projet
+### 1. Configuration de l'environnement
 
 ```bash
-git clone https://github.com/ton-compte/DiseaseScope___Project.git
-cd DiseaseScope___Project
-```
+# Cloner le dépôt
+git clone <url_du_projet>
+cd DiseaseScope____Project
 
-### 2. Créer l'environnement virtuel
+# Créer et activer l'environnement virtuel
+python -m venv .venv
+# Sur Windows :
+.venv\Scripts\activate
+# Sur Mac/Linux :
+source .venv/bin/activate
 
-```bash
-python -m venv venv
-venv\Scripts\activate          # Windows
-source venv/bin/activate       # Mac/Linux
-```
-
-### 3. Installer les dépendances
-
-```bash
+# Installer les dépendances
 pip install -r requirements.txt
-pip install flask pandas scikit-learn scipy joblib
 ```
 
-### 4. Lancer les scrapers (optionnel — données déjà incluses)
+### 2. Exécution de l'Application
 
-```bash
-python scrapers/pubmed_scraper.py
-python scrapers/europepmc_scraper.py
-python scrapers/who_scraper.py
-python scrapers/clinicaltrials_scraper.py
-python scrapers/medlineplus_scraper.py
-```
-
-### 5. Fusionner et nettoyer les données
-
-```bash
-python scrapers/fusionner.py
-python src/clean_data.py
-```
-
-### 6. Entraîner les modèles ML
-
-```bash
-python src/train_model.py
-python src/train_disease_classifier.py
-python src/train_content_type_classifier.py
-```
-
-### 7. Classifier et valider les articles
-
-```bash
-python src/verify_predictions.py
-```
-
-### 8. Lancer le dashboard web
-
+Pour lancer le serveur de visualisation local :
 ```bash
 streamlit run app.py
 ```
 
+### 3. Cycle de Réentraînement et Maintenance
 
-> **Note :** Le dashboard fonctionne même sans MongoDB grâce au mode de secours CSV automatique. Si MongoDB est disponible, il sera utilisé automatiquement.
+Si vous lancez à nouveau le scraper de données ou `topic_modeling.py`, suivez cet ordre pour mettre à jour la base de données et les modèles :
 
----
-## 📊 Fonctionnalités du Dashboard
+```bash
+# 1. Appliquer le post-processing des topics sur les nouvelles données
+python src/post_process_topics.py
 
-L'interface de **DiseaseScope** est une application web interactive et moderne développée avec **Streamlit**, arborant un design épuré et professionnel adapté à l'intelligence de recherche médicale. Elle s'articule autour de 3 modules principaux accessibles depuis la barre latérale :
+# 2. Re-classifier les types de publications
+python src/classify_content_type.py
 
-### 1. 📊 Dashboard Analytics (Vue d'ensemble)
-Cette page offre une vision macroscopique et statistique immédiate sur l'ensemble du corpus de données extrait (scraping et APIs).
-* **KPIs Dynamiques :** Suivi en temps réel des indicateurs clés (Nombre total d'articles indexés, diversité des sources médicales, volume de pathologies traitées et typologies de contenu).
-* **Visualisations Avancées (Plotly) :**
-  * **Distribution par Pathologie :** Histogramme interactif des volumes de publications par maladie.
-  * **Répartition par Source :** Graphique de type *Donut* affichant la part de marché de chaque base de données ou journal.
-  * **Évolution Temporelle :** Graphique d'aire (*Area Chart Spline*) lissant la chronologie des publications.
-  * **Matrices Croisées (Heatmaps) :** Deux matrices de corrélation interactives (`Pathologie × Type de contenu` et `Pathologie × Source`) pour détecter instantanément les axes de recherche les plus denses.
-
-### 2. 🔍 Recherche Scientifique & Filtrage Multi-Critères
-Un moteur de recherche à facettes pour explorer chirurgicalement la base de données d'articles indexés.
-* **Filtres Nominatifs :** Tri instantané par *Pathologie*, *Type de contenu* (essais cliniques, articles scientifiques, rapports de l'OMS), et *Source*.
-* **Curseur Temporel :** Un composant *Slider* pour restreindre la recherche à une plage d'années spécifique.
-* **Recherche Textuelle Libre :** Analyse de chaîne de caractères en temps réel isolant des mots-clés au sein des **titres** ou des **résumés** (abstracts).
-* **Pagination Optimisée :** Segmentation fluide de l'affichage des résultats par blocs d'articles pour garantir des performances optimales de l'interface.
-
-### 3. 🧪 Test Modèle ML (Inférence en direct)
-Une interface de test d'intelligence artificielle permettant de simuler l'évaluation et la classification de nouveaux textes médicaux en direct.
-* **Saisie Intuitive :** Formulaire de saisie pour soumettre le titre et le résumé d'une nouvelle étude clinique ou d'un rapport de santé.
-* **Inférence Multi-Tâches :** Requêtage instantané des modèles de Machine Learning entraînés en arrière-plan (`Random Forest` + vectorisation `TF-IDF`).
-* **Double Prédiction :** Génération automatique de deux badges de classification indépendants :
-  1. La **Pathologie** suspectée (ex: *Alzheimer*, *Cancer*, *Diabète*).
-  2. Le **Type de publication** sémantique (ex: *Clinical Trial*, *Scientific Article*, *Report Guideline*).
-
----
+# 3. Réentraîner le modèle de classification supervisé étalonné
+python src/train_model.py
+```
